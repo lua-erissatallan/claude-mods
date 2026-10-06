@@ -1,5 +1,3 @@
-import type { EngineInterface } from 'claude-code'
-
 export type Parked = { date: string; ageDays: number; text: string }
 
 export type Project = {
@@ -9,25 +7,10 @@ export type Project = {
   hasAgent: boolean
 }
 
-function parentOf(dir: string): string | null {
+export function parentOf(dir: string): string | null {
   if (dir === '/' || dir === '') return null
   const cut = dir.replace(/\/+$/, '').lastIndexOf('/')
   return cut <= 0 ? '/' : dir.slice(0, cut)
-}
-
-/** Walks up from the cwd to the nearest folder holding Claude_Memory/INDEX.md or lua.skill.yaml. */
-export async function findProject($: EngineInterface): Promise<Project | null> {
-  let dir: string | null = await $.session.cwd()
-  while (dir !== null) {
-    const hasMemory = await $.fs.exists(`${dir}/Claude_Memory/INDEX.md`)
-    const hasAgent = await $.fs.exists(`${dir}/lua.skill.yaml`)
-    if (hasMemory || hasAgent) {
-      const name = dir.slice(dir.lastIndexOf('/') + 1)
-      return { root: dir, name, memoryDir: hasMemory ? `${dir}/Claude_Memory` : null, hasAgent }
-    }
-    dir = parentOf(dir)
-  }
-  return null
 }
 
 export function batonOf(index: string): string | null {

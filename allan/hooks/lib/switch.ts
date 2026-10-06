@@ -25,4 +25,5 @@ export function textOf(options: Options, field: string, fallback: string): strin
 export const FEATURES: Record<string, readonly string[]> = {
   voice: ['voice', 'voiceStyle'],
   commit: ['commit', 'commitIdentity', 'commitEmail', 'commitInternalIds'],
+  pulse: ['pulse', 'pulseStaleDays'],
 }

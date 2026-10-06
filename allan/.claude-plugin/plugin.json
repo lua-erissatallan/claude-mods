@@ -2,7 +2,9 @@
   "name": "allan",
   "version": "0.1.0",
   "description": "Allan's workflow mods, built from his own session logs. Every feature has its own on/off row in /config and is switched with /mods on|off <feature>. ALLAN_MODS_OFF=1 disables all of them.",
-  "author": { "name": "Allan" },
+  "author": {
+    "name": "Allan"
+  },
   "types": "./types/index.d.ts",
   "userConfig": {
     "voice": {
@@ -18,7 +20,11 @@
       "description": "normal: answer first, short, plain. plain: as if explaining to a high school student, crucial detail kept. visual: normal plus small ASCII diagrams where a flow or structure is involved.",
       "required": false,
       "default": "normal",
-      "options": ["normal", "plain", "visual"]
+      "options": [
+        "normal",
+        "plain",
+        "visual"
+      ]
     },
     "commit": {
       "type": "boolean",
@@ -33,7 +39,11 @@
       "description": "What to do when git push would go out through a remote that is not github.com-lua or with a user.email that is not the work address.",
       "required": false,
       "default": "block",
-      "options": ["off", "warn", "block"]
+      "options": [
+        "off",
+        "warn",
+        "block"
+      ]
     },
     "commitEmail": {
       "type": "string",
@@ -48,7 +58,25 @@
       "description": "What to do when a PR body or comment, or a file written under docs/ or Business_Documents/, carries internal memory references (D12, H22, Claude_Memory, HANDOFFS).",
       "required": false,
       "default": "warn",
-      "options": ["off", "warn", "block"]
+      "options": [
+        "off",
+        "warn",
+        "block"
+      ]
+    },
+    "pulse": {
+      "type": "boolean",
+      "title": "pulse: project band and /pending",
+      "description": "A band above the prompt with this session's name, the project, the baton, parked items and handoffs addressed to you. /pending, /park and /unpark read and write INDEX.md.",
+      "required": false,
+      "default": true
+    },
+    "pulseStaleDays": {
+      "type": "number",
+      "title": "pulse: parked item counts as stale after (days)",
+      "description": "Parked items older than this turn the band yellow.",
+      "required": false,
+      "default": 7
     }
   }
 }

@@ -34,6 +34,10 @@ export function mods(on: On, options: Options): void {
     const [verb, target, ...rest] = e.args.trim().split(/\s+/).filter(Boolean)
     if (verb === undefined) return { text: listing(options) }
 
+    if ((verb === 'on' || verb === 'off') && target === undefined) {
+      return { text: `Which feature? For example /mods ${verb} voice. Features: ${Object.keys(FEATURES).join(', ')}.` }
+    }
+
     if ((verb === 'on' || verb === 'off') && target !== undefined) {
       if (!(target in FEATURES)) return { text: `No feature named "${target}". /mods lists them.` }
       await $.config.set({ key: `allan.${target}`, value: verb === 'on' })

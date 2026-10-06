@@ -3,6 +3,7 @@ import type { Register } from 'claude-code'
 
 import { commit } from './features/commit'
 import { mods, modsCommand } from './features/mods'
+import { pulse, pulseCommands } from './features/pulse'
 import { asStyle, styleCommand, voice, voiceText } from './features/voice'
 import { isOn, kill, textOf } from './lib/switch'
 
@@ -21,6 +22,7 @@ export const register: Register = (on, options) => {
     }
     await $.command.register(modsCommand)
     await $.command.register(styleCommand)
+    for (const spec of pulseCommands) await $.command.register(spec)
     return next(e)
   })
 
@@ -35,4 +37,5 @@ export const register: Register = (on, options) => {
   try { mods(on, options) } catch { /* reported by the engine */ }
   try { voice(on, options) } catch { /* reported by the engine */ }
   try { commit(on, options) } catch { /* reported by the engine */ }
+  try { pulse(on, options) } catch { /* reported by the engine */ }
 }
