@@ -94,4 +94,27 @@ describe('pulse', () => {
     const { text } = await $.command.run({ command: 'pending', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } } as never)
     expect(text).toContain('No Claude_Memory')
   })
+
+  test('the band draws the project, baton and parked count', async ($, on) => {
+    mock.env(on, {})
+    mock.clock(on)
+    on('session.cwd', () => ({ value: '/w/M-Kopa' }))
+    on('fs.exists', ($, e) => ({ value: e.path === '/w/M-Kopa/Claude_Memory/INDEX.md' || e.path === '/w/M-Kopa/Claude_Memory/HANDOFFS.md' }))
+    on('fs.read', ($, e) => ({ value: String(e.path).endsWith('INDEX.md') ? INDEX : HANDOFFS }))
+    on('command.register', ($, e) => ({ value: { command: e.name } }))
+    on('session.start', ($, e) => ({ cwd: e.cwd }))
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w/M-Kopa' })
+    for (const surface of ['terminal', 'desktop'] as const) {
+      const ui = await $.ui.mount({
+        plugin: 'allan',
+        surface,
+        component: 'AbovePrompt',
+        props: { hasSurvey: false, isWorking: false, maxRows: 4, bodyColumns: 120 },
+      } as never)
+      const text = (await ui.find({ type: 'Text', text: /M-Kopa/ } as never))?.text ?? ''
+      expect(text).toContain('M-Kopa')
+      expect(text).toContain('2 parked')
+      await ui.unmount()
+    }
+  })
 })

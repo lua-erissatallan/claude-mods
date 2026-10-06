@@ -94,7 +94,7 @@ describe('register', () => {
     })
     const { text } = await $.command.run(cmd('mods', 'off voice'))
     expect(set).toEqual([['allan.voice', false]])
-    expect(text).toContain('voice is off')
+    expect(text).toContain('voice is now off')
   })
 
   test('mods: /mods lists every feature', async ($, on) => {

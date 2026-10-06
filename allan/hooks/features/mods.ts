@@ -40,15 +40,20 @@ export function mods(on: On, options: Options): void {
 
     if ((verb === 'on' || verb === 'off') && target !== undefined) {
       if (!(target in FEATURES)) return { text: `No feature named "${target}". /mods lists them.` }
-      await $.config.set({ key: `allan.${target}`, value: verb === 'on' })
-      return { text: `${target} is ${verb}. It takes effect from the next prompt.` }
+      const wanted = verb === 'on'
+      const current = (options as Record<string, unknown>)[target] !== false
+      if (current === wanted) return { text: `${target} is already ${verb}.` }
+      // Changing a row reloads this plugin, so reply first and let the change land after.
+      void $.config.set({ key: `allan.${target}`, value: wanted })
+      return { text: `${target} is now ${verb}.` }
     }
 
     if (verb === 'set' && target !== undefined && rest.length > 0) {
       if (!FIELDS.has(target)) return { text: `No field named "${target}". /mods lists them.` }
       const raw = rest.join(' ')
       const value = raw === 'true' ? true : raw === 'false' ? false : raw
-      await $.config.set({ key: `allan.${target}`, value })
+      if ((options as Record<string, unknown>)[target] === value) return { text: `${target} is already ${raw}.` }
+      void $.config.set({ key: `allan.${target}`, value })
       return { text: `${target} = ${raw}.` }
     }
 

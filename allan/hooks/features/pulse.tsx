@@ -66,6 +66,12 @@ async function refresh($: EngineInterface, options: Options): Promise<void> {
 }
 
 export function pulse(on: On, options: Options): void {
+  // Also fires after each reload of this plugin, so the band is filled without waiting for a prompt.
+  on('session.start', { isInteractive: true }, async ($, e, next) => {
+    await refresh($, options)
+    return next(e)
+  })
+
   on('classic.SessionStart', async ($, e, next) => {
     if (typeof e.session_title === 'string' && e.session_title !== '') await update($, sessionName, () => e.session_title ?? null)
     await refresh($, options)
