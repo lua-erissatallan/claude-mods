@@ -1,0 +1,54 @@
+{
+  "name": "allan",
+  "version": "0.1.0",
+  "description": "Allan's workflow mods, built from his own session logs. Every feature has its own on/off row in /config and is switched with /mods on|off <feature>. ALLAN_MODS_OFF=1 disables all of them.",
+  "author": { "name": "Allan" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "voice": {
+      "type": "boolean",
+      "title": "voice: keep my reply style",
+      "description": "Adds Allan's reply rules to the system prompt so they survive compaction and new sessions. /style plain or /style visual changes the tone for this session.",
+      "required": false,
+      "default": true
+    },
+    "voiceStyle": {
+      "type": "string",
+      "title": "voice: default style",
+      "description": "normal: answer first, short, plain. plain: as if explaining to a high school student, crucial detail kept. visual: normal plus small ASCII diagrams where a flow or structure is involved.",
+      "required": false,
+      "default": "normal",
+      "options": ["normal", "plain", "visual"]
+    },
+    "commit": {
+      "type": "boolean",
+      "title": "commit: commit and push hygiene",
+      "description": "Removes Claude attribution from commits and PRs, checks the push identity, and flags internal ids in client-facing text.",
+      "required": false,
+      "default": true
+    },
+    "commitIdentity": {
+      "type": "string",
+      "title": "commit: wrong push identity",
+      "description": "What to do when git push would go out through a remote that is not github.com-lua or with a user.email that is not the work address.",
+      "required": false,
+      "default": "block",
+      "options": ["off", "warn", "block"]
+    },
+    "commitEmail": {
+      "type": "string",
+      "title": "commit: work email",
+      "description": "The user.email a push must carry.",
+      "required": false,
+      "default": "allan@luaimplementation.ai"
+    },
+    "commitInternalIds": {
+      "type": "string",
+      "title": "commit: internal ids in client-facing text",
+      "description": "What to do when a PR body or comment, or a file written under docs/ or Business_Documents/, carries internal memory references (D12, H22, Claude_Memory, HANDOFFS).",
+      "required": false,
+      "default": "warn",
+      "options": ["off", "warn", "block"]
+    }
+  }
+}

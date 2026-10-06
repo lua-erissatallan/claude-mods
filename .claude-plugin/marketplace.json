@@ -1,0 +1,11 @@
+{
+  "name": "allan-mods",
+  "owner": { "name": "Allan" },
+  "plugins": [
+    {
+      "name": "allan",
+      "source": "./allan",
+      "description": "Allan's workflow mods: voice, commit, pulse, handover, relay, askmode, release, watch, testguard, outbox. Each switchable with /mods."
+    }
+  ]
+}
