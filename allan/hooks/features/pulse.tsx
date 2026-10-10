@@ -14,6 +14,7 @@ const handoffItems = atom({ plugin: 'allan', key: 'handoffItems' } as const, [])
 const selected = atom({ plugin: 'allan', key: 'selected' } as const, null)
 
 const PARKED_HOTKEYS = '123456789'
+const LIST: PulseSelection = { kind: 'parkedList', index: 0 }
 
 export const pulseCommands = [
   { name: 'pending', description: 'What is pending here: baton, parked items with ages, open handoffs for this session. Reads the files, no model call.' },
@@ -74,7 +75,7 @@ async function refresh($: EngineInterface, options: Options): Promise<void> {
     staleCount: parked.filter(p => p.ageDays > staleDaysOf(options)).length,
     handoffs: mine.length,
   }
-  const nextParked: PulseParkedItem[] = parked.slice(0, PARKED_HOTKEYS.length).map((p, i) => ({ index: i + 1, ...p }))
+  const nextParked: PulseParkedItem[] = parked.map((p, i) => ({ index: i + 1, ...p }))
   const nextHandoffs: PulseHandoffItem[] = mine.map((r, i) => ({ index: i + 1, ...r }))
 
   await update($, view, () => nextView)
@@ -94,8 +95,8 @@ async function doUnpark($: EngineInterface, options: Options, n: number): Promis
   const done = removeParked(await $.fs.read(path), n)
   if (done === null) return `There is no parked item ${n}. /pending lists them.`
   await $.fs.write(path, done.text)
-  await update($, selected, () => null)
   await refresh($, options)
+  if ((await read($, selected))?.kind === 'parked') await update($, selected, () => LIST)
   return `Unparked: ${done.removed}`
 }
 
@@ -171,15 +172,12 @@ export function pulse(on: On, options: Options): void {
     const v = await read($, view)
     if (v === null || e.props.hasSurvey || !isOn(options, 'pulse')) return next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
-    const parked = await read($, parkedItems)
     const handoffs = await read($, handoffItems)
 
     const parts = [
       v.session ?? 'unnamed',
       v.project,
       v.baton === null ? null : `▶ ${v.baton.slice(0, 40)}`,
-      v.parked === 0 ? null : `⏳ ${v.parked} parked (oldest ${v.oldestDays}d)`,
-      v.handoffs === 0 ? null : `${v.handoffs} handoff${v.handoffs === 1 ? '' : 's'} for you`,
     ].filter((p): p is string => p !== null)
 
     const openOn = (target: PulseSelection) => async () => {
@@ -187,26 +185,22 @@ export function pulse(on: On, options: Options): void {
       void $.ui.open({ id: PANE, title: 'Pulse' })
     }
 
-    const hasButtons = parked.length > 0 || handoffs.length > 0
+    // One line: the details live in the pane, opened with p (parked) or h (handoffs).
+    const stale = v.staleCount > 0
     return (
-      <Box flexDirection="column">
-        <Text dimColor={v.staleCount === 0} color={v.staleCount > 0 ? 'yellow' : undefined}>
-          {parts.join('  ·  ')}
-        </Text>
-        {hasButtons && (
-          <Box>
-            <Text dimColor>select: </Text>
-            {parked.map(p => (
-              <Button key={`p${p.index}`} hotkey={PARKED_HOTKEYS[p.index - 1]} dimColor onPress={openOn({ kind: 'parked', index: p.index })}>
-                {PARKED_HOTKEYS[p.index - 1]}:{p.text.slice(0, 16)}
-              </Button>
-            ))}
-            {handoffs.length > 0 && (
-              <Button key="handoffs" hotkey="h" dimColor onPress={openOn({ kind: 'handoff', index: 1 })}>
-                h:{handoffs.length === 1 ? handoffs[0]?.id : `${handoffs.length} handoffs`}
-              </Button>
-            )}
-          </Box>
+      <Box>
+        <Text dimColor>{parts.join('  ·  ')}</Text>
+        {v.parked > 0 && <Text dimColor>  ·  </Text>}
+        {v.parked > 0 && (
+          <Button key="parked" hotkey="p" dimColor={!stale} onPress={openOn(LIST)}>
+            <Text color={stale ? 'yellow' : undefined}>p:⏳ {v.parked} parked (oldest {v.oldestDays}d)</Text>
+          </Button>
+        )}
+        {handoffs.length > 0 && <Text dimColor>  ·  </Text>}
+        {handoffs.length > 0 && (
+          <Button key="handoffs" hotkey="h" dimColor onPress={openOn({ kind: 'handoff', index: 1 })}>
+            h:{handoffs.length === 1 ? handoffs[0]?.id : `${handoffs.length} handoffs`}
+          </Button>
         )}
       </Box>
     )
@@ -217,11 +211,27 @@ export function pulse(on: On, options: Options): void {
     const sel = await read($, selected)
     const parked = await read($, parkedItems)
     const handoffs = await read($, handoffItems)
+    const close = async () => { await update($, selected, () => null) }
 
     if (sel === null) {
       return (
         <Box flexDirection="column">
-          <Text dimColor>Press a hotkey in the band (digits for parked, h for handoffs) to see it here.</Text>
+          <Text dimColor>Press p (parked) or h (handoffs) in the band to see them here.</Text>
+        </Box>
+      )
+    }
+
+    if (sel.kind === 'parkedList') {
+      if (parked.length === 0) return <Text dimColor>Nothing parked.</Text>
+      return (
+        <Box flexDirection="column">
+          <Text bold>⏳ Parked ({parked.length}): press a number</Text>
+          {parked.map(p => (
+            <Button key={`p${p.index}`} hotkey={PARKED_HOTKEYS[p.index - 1]} onPress={async () => { await update($, selected, () => ({ kind: 'parked' as const, index: p.index })) }}>
+              {p.index}. {p.ageDays}d · {p.text.slice(0, 70)}
+            </Button>
+          ))}
+          <Button role="dismiss" onPress={close}>Close</Button>
         </Box>
       )
     }
@@ -234,12 +244,11 @@ export function pulse(on: On, options: Options): void {
           <Text bold>Parked, {item.ageDays} days ago ({item.date})</Text>
           <Text>{item.text}</Text>
           <Box>
+            <Button key="back" hotkey="b" onPress={async () => { await update($, selected, () => LIST) }}>b:Back</Button>
             <Button variant="primary" onPress={async () => { await doUnpark($, options, item.index) }}>
               Unpark
             </Button>
-            <Button role="dismiss" onPress={async () => { await update($, selected, () => null) }}>
-              Close
-            </Button>
+            <Button role="dismiss" onPress={close}>Close</Button>
           </Box>
         </Box>
       )
@@ -263,9 +272,7 @@ export function pulse(on: On, options: Options): void {
           {handoffs.length > 1 && (
             <Button key="next" hotkey="n" onPress={step(1)}>n:Next</Button>
           )}
-          <Button role="dismiss" onPress={async () => { await update($, selected, () => null) }}>
-            Close
-          </Button>
+          <Button role="dismiss" onPress={close}>Close</Button>
         </Box>
       </Box>
     )

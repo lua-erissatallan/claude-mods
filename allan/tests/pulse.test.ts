@@ -113,7 +113,8 @@ describe('pulse', () => {
       } as never)
       const text = (await ui.find({ type: 'Text', text: /M-Kopa/ } as never))?.text ?? ''
       expect(text).toContain('M-Kopa')
-      expect(text).toContain('2 parked')
+      const parked = (await ui.find({ type: 'Text', text: /parked/ } as never))?.text ?? ''
+      expect(parked).toContain('2 parked (oldest')
       await ui.unmount()
     }
   })
@@ -137,15 +138,18 @@ describe('pulse', () => {
       component: 'AbovePrompt',
       props: { hasSurvey: false, isWorking: false, maxRows: 4, bodyColumns: 120 },
     } as never)
-    await band.press({ key: 'p1' } as never)
+    await band.press({ key: 'parked' } as never)
 
     const pane = await $.ui.mount({ plugin: 'allan', surface: 'terminal', component: 'Pane', requestId: 'allan-pulse', props: { title: 'Pulse', isFocused: true, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 20 } } } as never)
+    expect(await pane.find({ key: 'p2' } as never)).toBeTruthy()
+    await pane.press({ key: 'p1' } as never)
     const shown = (await pane.find({ type: 'Text', text: /lua-qc build waits/ } as never))?.text ?? ''
     expect(shown).toContain('lua-qc build waits')
 
     await pane.press({ key: 'Unpark' } as never)
     expect(writes.length).toBe(1)
     expect(writes[0]?.[1]).not.toContain('lua-qc build waits')
+    expect(await pane.find({ type: 'Text', text: /Parked \(/ } as never)).toBeTruthy()
 
     await band.unmount()
     await pane.unmount()

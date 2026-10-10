@@ -12,7 +12,7 @@ export type PulseView = {
 
 export type PulseParkedItem = { index: number; date: string; ageDays: number; text: string }
 export type PulseHandoffItem = { index: number; id: string; from: string; to: string; title: string }
-export type PulseSelection = { kind: 'parked' | 'handoff'; index: number } | null
+export type PulseSelection = { kind: 'parked' | 'handoff' | 'parkedList'; index: number } | null
 
 declare module 'claude-code' {
   interface PluginState {

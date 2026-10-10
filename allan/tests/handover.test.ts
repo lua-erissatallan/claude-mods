@@ -98,7 +98,7 @@ describe('handover', () => {
     await $.session.measure(measure(62))
     await $.session.measure(measure(64))
     await $.session.measure(measure(91))
-    expect(status).toEqual(['ctx 55%', 'ctx 62%', 'ctx 64%', 'ctx 91%'])
+    expect(status).toEqual([undefined, 'ctx 62%', 'ctx 64%', 'ctx 91%'])
     expect(toasts.length).toBe(2)
     expect(toasts[1]).toContain('now')
   })

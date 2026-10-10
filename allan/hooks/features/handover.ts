@@ -125,8 +125,9 @@ export function handover(on: On, options: Options): void {
     if (!isOn(options, 'handover') || !e.changed.includes('context')) return done
     const percent = e.context.percent
     if (percent === undefined) return done
-    $.ui.status(`ctx ${percent}%`)
     const thresholds = thresholdsOf(textOf(options, 'handoverThresholds', '60,70,80,90'))
+    // Quiet until the first threshold; cleared again after a compaction brings it back under.
+    $.ui.status(percent >= (thresholds[0] ?? 0) ? `ctx ${percent}%` : undefined)
     const result = alertFor(percent, thresholds, await read($, fired))
     await update($, fired, () => result.fired)
     if (result.alert !== null) $.ui.toast(alertText(percent, result.alert, thresholds))
