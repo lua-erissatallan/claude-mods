@@ -28,4 +28,5 @@ export const FEATURES: Record<string, readonly string[]> = {
   pulse: ['pulse', 'pulseStaleDays'],
   handover: ['handover', 'handoverThresholds', 'handoverLeadPattern', 'handoverBlockAutoCompact'],
   relay: ['relay'],
+  askmode: ['askmode', 'askmodeUseModel'],
 }

@@ -26,6 +26,7 @@ declare module 'claude-code' {
       selected: PulseSelection
       handoverFired: number[]
       inbox: RelayInboxItem[]
+      askTurn: boolean
     }
   }
 }

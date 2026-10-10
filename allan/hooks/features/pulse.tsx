@@ -14,6 +14,8 @@ const handoffItems = atom({ plugin: 'allan', key: 'handoffItems' } as const, [])
 const selected = atom({ plugin: 'allan', key: 'selected' } as const, null)
 // Messages other sessions relayed here (relay.ts records them).
 const inbox = atom({ plugin: 'allan', key: 'inbox' } as const, [])
+// askmode's mark on a question turn lasts until the turn completes.
+const askTurn = atom({ plugin: 'allan', key: 'askTurn' } as const, false)
 
 const PARKED_HOTKEYS = '123456789'
 const LIST: PulseSelection = { kind: 'parkedList', index: 0 }
@@ -123,6 +125,7 @@ export function pulse(on: On, options: Options): void {
 
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
+    await update($, askTurn, () => false)
     await refresh($, options)
     return done
   })

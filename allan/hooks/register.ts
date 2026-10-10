@@ -1,6 +1,7 @@
 import { atom, read } from 'claude-code'
 import type { Register } from 'claude-code'
 
+import { askmode, askmodeCommands } from './features/askmode'
 import { commit } from './features/commit'
 import { handover, handoverCommands } from './features/handover'
 import { mods, modsCommand } from './features/mods'
@@ -28,6 +29,7 @@ export const register: Register = (on, options) => {
     for (const spec of pulseCommands) await $.command.register(spec)
     for (const spec of handoverCommands) await $.command.register(spec)
     for (const spec of relayCommands) await $.command.register(spec)
+    for (const spec of askmodeCommands) await $.command.register(spec)
     // A reload keeps the old status line until the next measurement: set it now (handover's meter).
     try {
       const percent = (await $.session.usage()).context.percent
@@ -51,4 +53,5 @@ export const register: Register = (on, options) => {
   try { pulse(on, options) } catch { /* reported by the engine */ }
   try { handover(on, options) } catch { /* reported by the engine */ }
   try { relay(on, options) } catch { /* reported by the engine */ }
+  try { askmode(on, options) } catch { /* reported by the engine */ }
 }

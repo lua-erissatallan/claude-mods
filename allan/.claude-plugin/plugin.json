@@ -112,6 +112,20 @@
       "description": "Records each session (name, project, folder) in a registry shared across your sessions, lists them with /sessions, sends text or the last START/END block with /relay, and shows relayed messages in the pulse band.",
       "required": false,
       "default": true
+    },
+    "askmode": {
+      "type": "boolean",
+      "title": "askmode: a question turn cannot change things",
+      "description": "When a message only asks something, Edit, Write and changing commands (lua push/deploy/env -k/version create, git commit/push, vercel, rm, sed -i) are held back with a toast. Reply 'go' or /build to allow them.",
+      "required": false,
+      "default": true
+    },
+    "askmodeUseModel": {
+      "type": "boolean",
+      "title": "askmode: ask a small model when unsure",
+      "description": "For a message the word rules cannot place, one Haiku call decides whether it is a question.",
+      "required": false,
+      "default": false
     }
   }
 }
