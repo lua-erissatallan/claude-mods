@@ -77,6 +77,34 @@
       "description": "Parked items older than this turn the band yellow.",
       "required": false,
       "default": 7
+    },
+    "handover": {
+      "type": "boolean",
+      "title": "handover: context meter, /handover and /close",
+      "description": "Shows ctx % in the status line with alerts at the thresholds, keeps lead sessions from auto compacting, and adds /handover <successor> and /close.",
+      "required": false,
+      "default": true
+    },
+    "handoverThresholds": {
+      "type": "string",
+      "title": "handover: alert at these context percentages",
+      "description": "Comma separated; each alerts once per session. The last one says to hand over now.",
+      "required": false,
+      "default": "60,70,80,90"
+    },
+    "handoverLeadPattern": {
+      "type": "string",
+      "title": "handover: lead session names (regex)",
+      "description": "Sessions whose name matches skip auto compaction and are told to hand over instead.",
+      "required": false,
+      "default": "^(Orchestrator|Lead|Code)"
+    },
+    "handoverBlockAutoCompact": {
+      "type": "boolean",
+      "title": "handover: block auto compaction in lead sessions",
+      "description": "Off: lead sessions auto compact like any other. Manual /compact always works.",
+      "required": false,
+      "default": true
     }
   }
 }

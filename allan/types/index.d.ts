@@ -23,6 +23,7 @@ declare module 'claude-code' {
       parkedItems: PulseParkedItem[]
       handoffItems: PulseHandoffItem[]
       selected: PulseSelection
+      handoverFired: number[]
     }
   }
 }
