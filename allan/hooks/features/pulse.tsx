@@ -1,13 +1,20 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, On } from 'claude-code'
 
-import type { PulseView } from '../../types'
+import type { PulseHandoffItem, PulseParkedItem, PulseSelection, PulseView } from '../../types'
 import { addParked, isForSurface, openHandoffs, parseParkArgs, removeParked, surfaceOf } from '../lib/memory'
 import { batonOf, parentOf, parkedOf, type Project } from '../lib/project'
 import { isOn, type Options } from '../lib/switch'
 
+const PANE = 'allan-pulse'
 const view = atom({ plugin: 'allan', key: 'pulse' } as const, null)
 const sessionName = atom({ plugin: 'allan', key: 'session' } as const, null)
+const parkedItems = atom({ plugin: 'allan', key: 'parkedItems' } as const, [])
+const handoffItems = atom({ plugin: 'allan', key: 'handoffItems' } as const, [])
+const selected = atom({ plugin: 'allan', key: 'selected' } as const, null)
+
+const PARKED_HOTKEYS = '123456789'
+const HANDOFF_HOTKEYS = 'abcdefghi'
 
 export const pulseCommands = [
   { name: 'pending', description: 'What is pending here: baton, parked items with ages, open handoffs for this session. Reads the files, no model call.' },
@@ -41,11 +48,15 @@ async function readOr($: EngineInterface, path: string): Promise<string> {
 async function refresh($: EngineInterface, options: Options): Promise<void> {
   if (!isOn(options, 'pulse')) {
     await update($, view, () => null)
+    await update($, parkedItems, () => [])
+    await update($, handoffItems, () => [])
     return
   }
   const project = await findProject($)
   if (project === null || project.memoryDir === null) {
     await update($, view, () => null)
+    await update($, parkedItems, () => [])
+    await update($, handoffItems, () => [])
     return
   }
   const index = await readOr($, `${project.memoryDir}/INDEX.md`)
@@ -53,16 +64,40 @@ async function refresh($: EngineInterface, options: Options): Promise<void> {
   const session = await read($, sessionName)
   const parked = parkedOf(index, await $.clock.now())
   const surface = session === null ? '' : surfaceOf(session)
-  const next: PulseView = {
+  const mine = openHandoffs(handoffs).filter(r => isForSurface(r, surface))
+
+  const nextView: PulseView = {
     session,
     project: project.name,
     baton: batonOf(index),
     parked: parked.length,
     oldestDays: parked.reduce((m, p) => Math.max(m, p.ageDays), 0),
     staleCount: parked.filter(p => p.ageDays > staleDaysOf(options)).length,
-    handoffs: openHandoffs(handoffs).filter(r => isForSurface(r, surface)).length,
+    handoffs: mine.length,
   }
-  await update($, view, () => next)
+  const nextParked: PulseParkedItem[] = parked.slice(0, PARKED_HOTKEYS.length).map((p, i) => ({ index: i + 1, ...p }))
+  const nextHandoffs: PulseHandoffItem[] = mine.slice(0, HANDOFF_HOTKEYS.length).map((r, i) => ({ index: i + 1, ...r }))
+
+  await update($, view, () => nextView)
+  await update($, parkedItems, () => nextParked)
+  await update($, handoffItems, () => nextHandoffs)
+
+  // A selection pointing at an item that no longer exists (unparked, or the list shrank) is dropped.
+  const current = await read($, selected)
+  if (current?.kind === 'parked' && current.index > nextParked.length) await update($, selected, () => null)
+  if (current?.kind === 'handoff' && current.index > nextHandoffs.length) await update($, selected, () => null)
+}
+
+async function doUnpark($: EngineInterface, options: Options, n: number): Promise<string> {
+  const project = await findProject($)
+  if (project === null || project.memoryDir === null) return 'No Claude_Memory/INDEX.md above this folder.'
+  const path = `${project.memoryDir}/INDEX.md`
+  const done = removeParked(await $.fs.read(path), n)
+  if (done === null) return `There is no parked item ${n}. /pending lists them.`
+  await $.fs.write(path, done.text)
+  await update($, selected, () => null)
+  await refresh($, options)
+  return `Unparked: ${done.removed}`
 }
 
 export function pulse(on: On, options: Options): void {
@@ -130,20 +165,16 @@ export function pulse(on: On, options: Options): void {
   on('command.run', { command: 'unpark' }, async ($, e) => {
     const n = Number.parseInt(e.args.trim(), 10)
     if (!Number.isFinite(n) || n < 1) return { text: 'Usage: /unpark <n>, numbered as /pending lists them.' }
-    const project = await findProject($)
-    if (project === null || project.memoryDir === null) return { text: 'No Claude_Memory/INDEX.md above this folder.' }
-    const path = `${project.memoryDir}/INDEX.md`
-    const done = removeParked(await $.fs.read(path), n)
-    if (done === null) return { text: `There is no parked item ${n}. /pending lists them.` }
-    await $.fs.write(path, done.text)
-    await refresh($, options)
-    return { text: `Unparked: ${done.removed}` }
+    return { text: await doUnpark($, options, n) }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const v = await read($, view)
     if (v === null || e.props.hasSurvey || !isOn(options, 'pulse')) return next(e)
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const parked = await read($, parkedItems)
+    const handoffs = await read($, handoffItems)
+
     const parts = [
       v.session ?? 'unnamed',
       v.project,
@@ -151,11 +182,82 @@ export function pulse(on: On, options: Options): void {
       v.parked === 0 ? null : `⏳ ${v.parked} parked (oldest ${v.oldestDays}d)`,
       v.handoffs === 0 ? null : `${v.handoffs} handoff${v.handoffs === 1 ? '' : 's'} for you`,
     ].filter((p): p is string => p !== null)
+
+    const openOn = (target: PulseSelection) => async () => {
+      await update($, selected, () => target)
+      void $.ui.open({ id: PANE, title: 'Pulse' })
+    }
+
+    const hasButtons = parked.length > 0 || handoffs.length > 0
     return (
-      <Box>
+      <Box flexDirection="column">
         <Text dimColor={v.staleCount === 0} color={v.staleCount > 0 ? 'yellow' : undefined}>
           {parts.join('  ·  ')}
         </Text>
+        {hasButtons && (
+          <Box>
+            <Text dimColor>select: </Text>
+            {parked.map(p => (
+              <Button key={`p${p.index}`} hotkey={PARKED_HOTKEYS[p.index - 1]} dimColor onPress={openOn({ kind: 'parked', index: p.index })}>
+                {PARKED_HOTKEYS[p.index - 1]}:{p.text.slice(0, 16)}
+              </Button>
+            ))}
+            {handoffs.map(row => (
+              <Button key={`h${row.index}`} hotkey={HANDOFF_HOTKEYS[row.index - 1]} dimColor onPress={openOn({ kind: 'handoff', index: row.index })}>
+                {HANDOFF_HOTKEYS[row.index - 1]}:{row.id}
+              </Button>
+            ))}
+          </Box>
+        )}
+      </Box>
+    )
+  })
+
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const sel = await read($, selected)
+    const parked = await read($, parkedItems)
+    const handoffs = await read($, handoffItems)
+
+    if (sel === null) {
+      return (
+        <Box flexDirection="column">
+          <Text dimColor>Press a hotkey in the band (digits for parked, letters for handoffs) to see it here.</Text>
+        </Box>
+      )
+    }
+
+    if (sel.kind === 'parked') {
+      const item = parked.find(p => p.index === sel.index)
+      if (item === undefined) return <Text dimColor>That parked item is gone.</Text>
+      return (
+        <Box flexDirection="column">
+          <Text bold>Parked, {item.ageDays} days ago ({item.date})</Text>
+          <Text>{item.text}</Text>
+          <Box>
+            <Button variant="primary" onPress={async () => { await doUnpark($, options, item.index) }}>
+              Unpark
+            </Button>
+            <Button role="dismiss" onPress={async () => { await update($, selected, () => null) }}>
+              Close
+            </Button>
+          </Box>
+        </Box>
+      )
+    }
+
+    const item = handoffs.find(h => h.index === sel.index)
+    if (item === undefined) return <Text dimColor>That handoff is gone.</Text>
+    return (
+      <Box flexDirection="column">
+        <Text bold>{item.id}</Text>
+        <Text dimColor>from {item.from} → {item.to}</Text>
+        <Text>{item.title}</Text>
+        <Box>
+          <Button role="dismiss" onPress={async () => { await update($, selected, () => null) }}>
+            Close
+          </Button>
+        </Box>
       </Box>
     )
   })

@@ -117,4 +117,69 @@ describe('pulse', () => {
       await ui.unmount()
     }
   })
+
+  test('selecting a parked item in the band shows it in the pane, with Unpark', async ($, on) => {
+    mock.env(on, {})
+    mock.clock(on)
+    on('session.cwd', () => ({ value: '/w/M-Kopa' }))
+    on('fs.exists', ($, e) => ({ value: e.path === '/w/M-Kopa/Claude_Memory/INDEX.md' || e.path === '/w/M-Kopa/Claude_Memory/HANDOFFS.md' }))
+    on('fs.read', ($, e) => ({ value: String(e.path).endsWith('INDEX.md') ? INDEX : HANDOFFS }))
+    const writes: Array<[string, string]> = []
+    on('fs.write', ($, e) => { writes.push([String(e.path), String(e.text)]); return { value: undefined } })
+    on('command.register', ($, e) => ({ value: { command: e.name } }))
+    on('session.start', ($, e) => ({ cwd: e.cwd }))
+    on('ui.open', () => ({ value: { isPlaced: true } }))
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w/M-Kopa' })
+
+    const band = await $.ui.mount({
+      plugin: 'allan',
+      surface: 'terminal',
+      component: 'AbovePrompt',
+      props: { hasSurvey: false, isWorking: false, maxRows: 4, bodyColumns: 120 },
+    } as never)
+    await band.press({ key: 'p1' } as never)
+
+    const pane = await $.ui.mount({ plugin: 'allan', surface: 'terminal', component: 'Pane', requestId: 'allan-pulse', props: { title: 'Pulse', isFocused: true, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 20 } } } as never)
+    const shown = (await pane.find({ type: 'Text', text: /lua-qc build waits/ } as never))?.text ?? ''
+    expect(shown).toContain('lua-qc build waits')
+
+    await pane.press({ key: 'Unpark' } as never)
+    expect(writes.length).toBe(1)
+    expect(writes[0]?.[1]).not.toContain('lua-qc build waits')
+
+    await band.unmount()
+    await pane.unmount()
+  })
+
+  test('selecting a handoff shows its id and title, read only', async ($, on) => {
+    mock.env(on, {})
+    mock.clock(on)
+    on('session.cwd', () => ({ value: '/w/M-Kopa' }))
+    on('fs.exists', ($, e) => ({ value: e.path === '/w/M-Kopa/Claude_Memory/INDEX.md' || e.path === '/w/M-Kopa/Claude_Memory/HANDOFFS.md' }))
+    on('fs.read', ($, e) => ({ value: String(e.path).endsWith('INDEX.md') ? INDEX : HANDOFFS }))
+    let wrote = false
+    on('fs.write', () => { wrote = true; return { value: undefined } })
+    on('command.register', ($, e) => ({ value: { command: e.name } }))
+    on('session.start', ($, e) => ({ cwd: e.cwd }))
+    on('ui.open', () => ({ value: { isPlaced: true } }))
+    on('classic.UserPromptSubmit', ($, e) => ({ prompt: e.prompt } as never))
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w/M-Kopa' })
+    await $.classic.UserPromptSubmit({ prompt: 'hi', session_title: 'Code' } as never)
+
+    const band = await $.ui.mount({
+      plugin: 'allan',
+      surface: 'terminal',
+      component: 'AbovePrompt',
+      props: { hasSurvey: false, isWorking: false, maxRows: 4, bodyColumns: 120 },
+    } as never)
+    await band.press({ key: 'h1' } as never)
+
+    const pane = await $.ui.mount({ plugin: 'allan', surface: 'terminal', component: 'Pane', requestId: 'allan-pulse', props: { title: 'Pulse', isFocused: true, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 20 } } } as never)
+    const shown = (await pane.find({ type: 'Text', text: /O16/ } as never))?.text ?? ''
+    expect(shown).toBe('O16')
+    expect(wrote).toBe(false)
+
+    await band.unmount()
+    await pane.unmount()
+  })
 })

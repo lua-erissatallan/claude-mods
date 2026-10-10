@@ -24,7 +24,7 @@ Guards fail open: if a mod's own code breaks, the call it was checking goes ahea
 | mods | built | `/mods` lists and switches everything | |
 | voice | built | Keeps Allan's reply rules in the system prompt (survives compaction); `/style normal \| plain \| visual` per session | `voice`, `voiceStyle` |
 | commit | built | Strips Claude attribution from commits and PRs; refuses a push that would leave through a non `github.com-lua` remote or a non work email; flags internal ids (D12, H22, Claude_Memory) in PR text and in files under `docs/` or `Business_Documents/` | `commit`, `commitIdentity` (off/warn/block), `commitEmail`, `commitInternalIds` (off/warn/block) |
-| pulse | built | Band above the prompt: session name, project, baton, parked count and oldest age (yellow when any is stale), handoffs addressed to this session's surface. `/pending` answers from INDEX and HANDOFFS with no model call; `/park "what" "next step"` and `/unpark <n>` write INDEX | `pulse`, `pulseStaleDays` |
+| pulse | built | Band above the prompt: session name, project, baton, parked count and oldest age (yellow when any is stale), handoffs addressed to this session's surface. Each parked item and handoff gets a hotkey button (digits for parked, letters for handoffs); press one, or ctrl+x tab to the band then press it, to open a pane with the full item and, for a parked item, an Unpark button. `/pending` answers from INDEX and HANDOFFS with no model call; `/park "what" "next step"` and `/unpark <n>` write INDEX | `pulse`, `pulseStaleDays` |
 | handover | next | Context meter and alerts, auto compaction guard, `/handover`, `/close` | |
 | relay | planned | `/relay <session>` and `/sessions` | |
 | askmode | planned | A question turn cannot edit files or touch production | |
