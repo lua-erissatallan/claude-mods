@@ -94,9 +94,11 @@ export function wrap(text: string, me: string, project: string): string {
 
 const HEADER = /^\[relay from (.+?) · (.+?)\]/
 
+const ENVELOPE = /from-name="([^"]+)"/
+
 export function inboxItem(text: string, at: number): InboxItem {
   const m = text.match(HEADER)
-  const from = m === null ? 'another session' : `${m[1]} (${m[2]})`
+  const from = m !== null ? `${m[1]} (${m[2]})` : (text.match(ENVELOPE)?.[1] ?? 'another session')
   const body = (m === null ? text : text.slice(m[0].length)).replace(/^\s*▼▼▼[^\n]*\n/, '').trim()
   return { from, at, preview: body.split('\n')[0]?.slice(0, 80) ?? '' }
 }

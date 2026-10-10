@@ -24,8 +24,8 @@ async function projectOf($: EngineInterface, dir: string): Promise<string> {
   return dir.slice(dir.lastIndexOf('/') + 1)
 }
 
-/** Claude Code's own list of running sessions (~/.claude/sessions), each with its project. */
-async function registry($: EngineInterface): Promise<SessionEntry[]> {
+/** Every file of Claude Code's own list of sessions (~/.claude/sessions), parsed. */
+async function sessionFiles($: EngineInterface): Promise<Array<Omit<SessionEntry, 'project'>>> {
   const dir = `${(await $.env.get('HOME')) ?? ''}/.claude/sessions`
   if (!(await $.fs.exists(dir))) return []
   const found: Array<Omit<SessionEntry, 'project'>> = []
@@ -34,6 +34,18 @@ async function registry($: EngineInterface): Promise<SessionEntry[]> {
     const entry = parseSessionFile(await $.fs.read(`${dir}/${f.name}`))
     if (entry !== null) found.push(entry)
   }
+  return found
+}
+
+/** This session's name as /rename set it (Claude Code's list), else as pulse saw it, else its id. */
+async function selfName($: EngineInterface): Promise<string> {
+  const id = await $.session.id()
+  return (await sessionFiles($)).find(s => s.id === id)?.name ?? (await read($, sessionName)) ?? id.slice(0, 8)
+}
+
+/** Claude Code's own list of running sessions, each with its project. */
+async function registry($: EngineInterface): Promise<SessionEntry[]> {
+  const found = await sessionFiles($)
   if (found.length === 0) return []
   // A file left behind by a session that crashed names a pid no longer running.
   const ps = await $.process.run(['ps', '-o', 'pid=', '-p', found.map(s => s.pid).join(',')])
@@ -88,6 +100,16 @@ export function relay(on: On, options: Options): void {
   on('command.run', { command: 'relay' }, async ($, e) => {
     if (!isOn(options, 'relay')) return { text: 'relay is off (/mods on relay).' }
     return { text: await send($, e.args) }
+  })
+
+  // Everything this session's model sends another session (SendMessage) carries the sender too.
+  on('session.send', async ($, e, next) => {
+    if (!isOn(options, 'relay') || e.origin?.kind !== 'model' || e.agentId !== undefined || e.text.startsWith('[relay from ')) return next(e)
+    let text = e.text
+    try {
+      text = wrap(e.text, await selfName($), await projectOf($, await $.session.cwd()))
+    } catch { /* send it unheaded rather than not at all */ }
+    return next({ ...e, text })
   })
 
   // A message from another session goes on to the model as usual; the band shows it arrived.

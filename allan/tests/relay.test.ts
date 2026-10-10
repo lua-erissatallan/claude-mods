@@ -63,6 +63,7 @@ describe('relay', () => {
     const item = inboxItem(`[relay from Orchestrator · Jackfruit]\n${BLOCK}`, NOW)
     expect(item.from).toBe('Orchestrator (Jackfruit)')
     expect(item.preview).toBe('Run Phase 0.')
+    expect(inboxItem('<cross-session-message from="uds:/tmp/x.sock" from-name="Code-Calendar-6">\ngot it', NOW).from).toBe('Code-Calendar-6')
   })
 })
 
@@ -161,5 +162,20 @@ describe('relay commands', () => {
     expect(r.text).toContain('hi')
     const { text } = await $.command.run(cmd('relay', 'Orchestrator hi'))
     expect(text).toContain('relay is off')
+  })
+
+  test("the model's own SendMessage carries the sender header; plugin sends and headed text are left alone", async ($, on) => {
+    const world = seeded(on)
+    await $.session.send({ to: 's1000000', text: 'got it', origin: { kind: 'model' } } as never)
+    expect(world.sent[0]?.text).toBe('[relay from Code-3 · M-Kopa]\ngot it')
+    world.sent = []
+    await $.session.send({ to: 's1000000', text: '[relay from Code-3 · M-Kopa]\nhi', origin: { kind: 'model' } } as never)
+    expect(world.sent[0]?.text).toBe('[relay from Code-3 · M-Kopa]\nhi')
+  })
+
+  test('relay off: model sends go out unheaded', { options: { relay: false } }, async ($, on) => {
+    const world = seeded(on)
+    await $.session.send({ to: 's1000000', text: 'got it', origin: { kind: 'model' } } as never)
+    expect(world.sent[0]?.text).toBe('got it')
   })
 })
