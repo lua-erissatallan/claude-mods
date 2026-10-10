@@ -123,6 +123,7 @@ export function pulse(on: On, options: Options): void {
   // Also fires after each reload of this plugin, so the band is filled without waiting for a prompt.
   on('session.start', { isInteractive: true }, async ($, e, next) => {
     await refresh($, options)
+    try { await record($, options) } catch { /* the registry is a convenience */ }
     return next(e)
   })
 

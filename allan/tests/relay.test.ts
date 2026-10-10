@@ -154,4 +154,18 @@ describe('relay commands', () => {
     const { text } = await $.command.run(cmd('relay', 'Orchestrator hi'))
     expect(text).toContain('relay is off')
   })
+
+  test('/sessions works before any prompt: the caller registers itself', async ($, on) => {
+    const world = seeded(on)
+    const { text } = await $.command.run(cmd('sessions', ''))
+    expect(text).toContain('← this session')
+    expect(world.store.has('session:self')).toBe(true)
+  })
+
+  test('a reload registers the session without waiting for a prompt', async ($, on) => {
+    const world = seeded(on)
+    on('session.usage', () => ({ value: { context: { window: 200_000 }, rateLimits: [] } }) as never)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w/M-Kopa' })
+    expect(world.store.has('session:self')).toBe(true)
+  })
 })

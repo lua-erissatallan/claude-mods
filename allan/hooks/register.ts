@@ -7,6 +7,7 @@ import { mods, modsCommand } from './features/mods'
 import { pulse, pulseCommands } from './features/pulse'
 import { relay, relayCommands } from './features/relay'
 import { asStyle, styleCommand, voice, voiceText } from './features/voice'
+import { thresholdsOf } from './lib/handover'
 import { isOn, kill, textOf } from './lib/switch'
 
 // The same session value voice.ts writes from /style.
@@ -27,6 +28,12 @@ export const register: Register = (on, options) => {
     for (const spec of pulseCommands) await $.command.register(spec)
     for (const spec of handoverCommands) await $.command.register(spec)
     for (const spec of relayCommands) await $.command.register(spec)
+    // A reload keeps the old status line until the next measurement: set it now (handover's meter).
+    try {
+      const percent = (await $.session.usage()).context.percent
+      const lowest = thresholdsOf(textOf(options, 'handoverThresholds', '60,70,80,90'))[0] ?? 0
+      $.ui.status(isOn(options, 'handover') && percent !== undefined && percent >= lowest ? `ctx ${percent}%` : undefined)
+    } catch { /* the meter is a convenience */ }
     return next(e)
   })
 

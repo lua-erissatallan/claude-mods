@@ -183,4 +183,21 @@ describe('handover', () => {
     expect(r.skip).toBeUndefined()
     expect(touched).toBe(false)
   })
+
+  test('a reload clears a stale meter below the first threshold, and sets it above', async ($, on) => {
+    const start = workspace(on)
+    const status: Array<string | undefined> = []
+    let percent = 19
+    on('ui.status', ($, e) => { status.push(e.text); return { value: undefined } })
+    on('session.usage', () => ({ value: { context: { window: 200_000, percent }, rateLimits: [] } }) as never)
+    on('command.register', ($, e) => ({ value: { command: e.name } }))
+    on('session.start', ($, e) => ({ cwd: e.cwd }))
+    on('session.id', () => ({ value: 'abc' }))
+    mock.store(on)
+    await start($)
+    await $.session.start({ surface: 'terminal', isInteractive: false, cwd: '/w/M-Kopa' })
+    percent = 72
+    await $.session.start({ surface: 'terminal', isInteractive: false, cwd: '/w/M-Kopa' })
+    expect(status).toEqual([undefined, 'ctx 72%'])
+  })
 })

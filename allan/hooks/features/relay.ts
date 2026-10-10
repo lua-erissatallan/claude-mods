@@ -25,6 +25,13 @@ async function projectName($: EngineInterface): Promise<string> {
   return cwd.slice(cwd.lastIndexOf('/') + 1)
 }
 
+/** Puts this session in the registry, so /sessions and /relay work before its first prompt. */
+async function recordSelf($: EngineInterface, now: number): Promise<void> {
+  const id = await $.session.id()
+  const entry: SessionEntry = { id, name: await read($, sessionName), project: await projectName($), cwd: await $.session.cwd(), lastSeen: now }
+  await $.store.set(`${STORE_PREFIX}${id}`, entry)
+}
+
 /** Every session in the registry; entries unseen for a week are forgotten on the way. */
 async function registry($: EngineInterface, now: number): Promise<SessionEntry[]> {
   const out: SessionEntry[] = []
@@ -46,6 +53,7 @@ async function send($: EngineInterface, args: string): Promise<string> {
   const now = await $.clock.now()
   const selfId = await $.session.id()
   const project = await projectName($)
+  await recordSelf($, now)
   const found = resolve(target, await registry($, now), selfId, project, now)
   if (!found.ok) return found.why
 
@@ -70,6 +78,7 @@ export function relay(on: On, options: Options): void {
   on('command.run', { command: 'sessions' }, async $ => {
     if (!isOn(options, 'relay')) return { text: 'relay is off (/mods on relay).' }
     const now = await $.clock.now()
+    await recordSelf($, now)
     return { text: listing(await registry($, now), await $.session.id(), await projectName($), now) }
   })
 
