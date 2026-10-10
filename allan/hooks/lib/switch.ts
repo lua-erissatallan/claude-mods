@@ -27,4 +27,5 @@ export const FEATURES: Record<string, readonly string[]> = {
   commit: ['commit', 'commitIdentity', 'commitEmail', 'commitInternalIds'],
   pulse: ['pulse', 'pulseStaleDays'],
   handover: ['handover', 'handoverThresholds', 'handoverLeadPattern', 'handoverBlockAutoCompact'],
+  relay: ['relay'],
 }

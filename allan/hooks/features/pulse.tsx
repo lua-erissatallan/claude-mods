@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, On } from 'claude-code'
 
 import type { PulseHandoffItem, PulseParkedItem, PulseSelection, PulseView } from '../../types'
+import { STORE_PREFIX, type SessionEntry } from '../lib/relay'
 import { addParked, isForSurface, openHandoffs, parseParkArgs, removeParked, surfaceOf } from '../lib/memory'
 import { batonOf, parentOf, parkedOf, type Project } from '../lib/project'
 import { isOn, type Options } from '../lib/switch'
@@ -12,6 +13,8 @@ const sessionName = atom({ plugin: 'allan', key: 'session' } as const, null)
 const parkedItems = atom({ plugin: 'allan', key: 'parkedItems' } as const, [])
 const handoffItems = atom({ plugin: 'allan', key: 'handoffItems' } as const, [])
 const selected = atom({ plugin: 'allan', key: 'selected' } as const, null)
+// Messages other sessions relayed here (relay.ts records them).
+const inbox = atom({ plugin: 'allan', key: 'inbox' } as const, [])
 
 const PARKED_HOTKEYS = '123456789'
 const LIST: PulseSelection = { kind: 'parkedList', index: 0 }
@@ -88,6 +91,22 @@ async function refresh($: EngineInterface, options: Options): Promise<void> {
   if (current?.kind === 'handoff' && current.index > nextHandoffs.length) await update($, selected, () => null)
 }
 
+/** Puts this session in the cross-session registry relay reads (/sessions, /relay). */
+async function record($: EngineInterface, options: Options): Promise<void> {
+  if (!isOn(options, 'relay')) return
+  const id = await $.session.id()
+  const cwd = await $.session.cwd()
+  const project = await findProject($)
+  const entry: SessionEntry = {
+    id,
+    name: await read($, sessionName),
+    project: project?.name ?? cwd.slice(cwd.lastIndexOf('/') + 1),
+    cwd,
+    lastSeen: await $.clock.now(),
+  }
+  await $.store.set(`${STORE_PREFIX}${id}`, entry)
+}
+
 async function doUnpark($: EngineInterface, options: Options, n: number): Promise<string> {
   const project = await findProject($)
   if (project === null || project.memoryDir === null) return 'No Claude_Memory/INDEX.md above this folder.'
@@ -110,18 +129,21 @@ export function pulse(on: On, options: Options): void {
   on('classic.SessionStart', async ($, e, next) => {
     if (typeof e.session_title === 'string' && e.session_title !== '') await update($, sessionName, () => e.session_title ?? null)
     await refresh($, options)
+    try { await record($, options) } catch { /* the registry is a convenience */ }
     return next(e)
   })
 
   on('classic.UserPromptSubmit', async ($, e, next) => {
     if (typeof e.session_title === 'string' && e.session_title !== '') await update($, sessionName, () => e.session_title ?? null)
     await refresh($, options)
+    try { await record($, options) } catch { /* the registry is a convenience */ }
     return next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
     await refresh($, options)
+    try { await record($, options) } catch { /* the registry is a convenience */ }
     return done
   })
 
@@ -173,6 +195,7 @@ export function pulse(on: On, options: Options): void {
     if (v === null || e.props.hasSurvey || !isOn(options, 'pulse')) return next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
     const handoffs = await read($, handoffItems)
+    const received = await read($, inbox)
 
     const parts = [
       v.session ?? 'unnamed',
@@ -202,6 +225,12 @@ export function pulse(on: On, options: Options): void {
             h:{handoffs.length === 1 ? handoffs[0]?.id : `${handoffs.length} handoffs`}
           </Button>
         )}
+        {received.length > 0 && <Text dimColor>  ·  </Text>}
+        {received.length > 0 && (
+          <Button key="inbox" hotkey="i" onPress={openOn({ kind: 'inbox', index: 0 })}>
+            <Text color="cyan">i:✉ {received.length} from {received[received.length - 1]?.from}</Text>
+          </Button>
+        )}
       </Box>
     )
   })
@@ -216,7 +245,24 @@ export function pulse(on: On, options: Options): void {
     if (sel === null) {
       return (
         <Box flexDirection="column">
-          <Text dimColor>Press p (parked) or h (handoffs) in the band to see them here.</Text>
+          <Text dimColor>Press p (parked), h (handoffs) or i (inbox) in the band to see them here.</Text>
+        </Box>
+      )
+    }
+
+    if (sel.kind === 'inbox') {
+      const received = await read($, inbox)
+      if (received.length === 0) return <Text dimColor>Inbox empty.</Text>
+      return (
+        <Box flexDirection="column">
+          <Text bold>✉ Relayed to this session ({received.length})</Text>
+          {received.map((m, i) => (
+            <Text key={`m${i}`}>{new Date(m.at).toISOString().slice(11, 16)} · {m.from} · {m.preview}</Text>
+          ))}
+          <Box>
+            <Button key="clear" variant="primary" onPress={async () => { await update($, inbox, () => []); await close() }}>Clear</Button>
+            <Button role="dismiss" onPress={close}>Close</Button>
+          </Box>
         </Box>
       )
     }

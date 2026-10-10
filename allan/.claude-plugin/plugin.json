@@ -105,6 +105,13 @@
       "description": "Off: lead sessions auto compact like any other. Manual /compact always works.",
       "required": false,
       "default": true
+    },
+    "relay": {
+      "type": "boolean",
+      "title": "relay: /sessions and /relay between sessions",
+      "description": "Records each session (name, project, folder) in a registry shared across your sessions, lists them with /sessions, sends text or the last START/END block with /relay, and shows relayed messages in the pulse band.",
+      "required": false,
+      "default": true
     }
   }
 }
