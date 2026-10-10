@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, On } from 'claude-code'
 
-import { FORGET_MS, inboxItem, isEntry, lastBlock, listing, resolve, STORE_PREFIX, wrap, type SessionEntry } from '../lib/relay'
+import { alivePids, inboxItem, label, lastBlock, listing, parseSessionFile, resolve, wrap, type SessionEntry } from '../lib/relay'
 import { parentOf } from '../lib/project'
 import { isOn, type Options } from '../lib/switch'
 
@@ -10,36 +10,41 @@ const sessionName = atom({ plugin: 'allan', key: 'session' } as const, null)
 const inbox = atom({ plugin: 'allan', key: 'inbox' } as const, [])
 
 export const relayCommands = [
-  { name: 'sessions', description: 'Your sessions seen in the last 12 hours, this project first, then the others by project.' },
+  { name: 'sessions', description: 'Your open Claude Code sessions, this project first, then the others by project.' },
   { name: 'relay', description: 'Send text, or the last START/END block of my last reply, to another session: /relay Code-4 last · /relay Jackfruit/Code-QC <text>', argumentHint: '<name|Project/name> <text|last>' },
 ]
 
-/** The nearest folder above the cwd holding Claude_Memory/INDEX.md or lua.skill.yaml, by name; else the cwd's name. */
-async function projectName($: EngineInterface): Promise<string> {
-  const cwd = await $.session.cwd()
-  let dir: string | null = cwd
-  while (dir !== null) {
-    if ((await $.fs.exists(`${dir}/Claude_Memory/INDEX.md`)) || (await $.fs.exists(`${dir}/lua.skill.yaml`))) return dir.slice(dir.lastIndexOf('/') + 1)
-    dir = parentOf(dir)
+/** The nearest folder at or above `dir` holding Claude_Memory/INDEX.md or lua.skill.yaml, by name; else `dir`'s own name. */
+async function projectOf($: EngineInterface, dir: string): Promise<string> {
+  let at: string | null = dir
+  while (at !== null) {
+    if ((await $.fs.exists(`${at}/Claude_Memory/INDEX.md`)) || (await $.fs.exists(`${at}/lua.skill.yaml`))) return at.slice(at.lastIndexOf('/') + 1)
+    at = parentOf(at)
   }
-  return cwd.slice(cwd.lastIndexOf('/') + 1)
+  return dir.slice(dir.lastIndexOf('/') + 1)
 }
 
-/** Puts this session in the registry, so /sessions and /relay work before its first prompt. */
-async function recordSelf($: EngineInterface, now: number): Promise<void> {
-  const id = await $.session.id()
-  const entry: SessionEntry = { id, name: await read($, sessionName), project: await projectName($), cwd: await $.session.cwd(), lastSeen: now }
-  await $.store.set(`${STORE_PREFIX}${id}`, entry)
-}
-
-/** Every session in the registry; entries unseen for a week are forgotten on the way. */
-async function registry($: EngineInterface, now: number): Promise<SessionEntry[]> {
+/** Claude Code's own list of running sessions (~/.claude/sessions), each with its project. */
+async function registry($: EngineInterface): Promise<SessionEntry[]> {
+  const dir = `${(await $.env.get('HOME')) ?? ''}/.claude/sessions`
+  if (!(await $.fs.exists(dir))) return []
+  const found: Array<Omit<SessionEntry, 'project'>> = []
+  for (const f of await $.fs.list(dir)) {
+    if (f.kind !== 'file' || !f.name.endsWith('.json')) continue
+    const entry = parseSessionFile(await $.fs.read(`${dir}/${f.name}`))
+    if (entry !== null) found.push(entry)
+  }
+  if (found.length === 0) return []
+  // A file left behind by a session that crashed names a pid no longer running.
+  const ps = await $.process.run(['ps', '-o', 'pid=', '-p', found.map(s => s.pid).join(',')])
+  const alive = alivePids(ps.stdout)
+  const projects = new Map<string, string>()
   const out: SessionEntry[] = []
-  for (const key of await $.store.keys()) {
-    if (!key.startsWith(STORE_PREFIX)) continue
-    const entry = await $.store.get(key)
-    if (!isEntry(entry) || now - entry.lastSeen > FORGET_MS) await $.store.delete(key)
-    else out.push(entry)
+  for (const s of found) {
+    if (!alive.has(s.pid)) continue
+    const project = projects.get(s.cwd) ?? (await projectOf($, s.cwd))
+    projects.set(s.cwd, project)
+    out.push({ ...s, project })
   }
   return out
 }
@@ -50,11 +55,10 @@ async function send($: EngineInterface, args: string): Promise<string> {
   const target = m[1] ?? ''
   const rest = (m[2] ?? '').trim()
 
-  const now = await $.clock.now()
   const selfId = await $.session.id()
-  const project = await projectName($)
-  await recordSelf($, now)
-  const found = resolve(target, await registry($, now), selfId, project, now)
+  const project = await projectOf($, await $.session.cwd())
+  const all = await registry($)
+  const found = resolve(target, all, selfId, project)
   if (!found.ok) return found.why
 
   let body = rest
@@ -65,9 +69,9 @@ async function send($: EngineInterface, args: string): Promise<string> {
     body = block
   }
 
-  const me = (await read($, sessionName)) ?? `unnamed ${selfId.slice(0, 8)}`
+  const me = all.find(s => s.id === selfId)?.name ?? (await read($, sessionName)) ?? selfId.slice(0, 8)
   const text = wrap(body, me, project)
-  const to = `${found.to.project}/${found.to.name ?? found.to.id.slice(0, 8)}`
+  const to = `${found.to.project}/${label(found.to)}`
   const sent = await $.session.send({ to: { sessionId: found.to.id }, text })
   if (sent.isDelivered) return `Relayed to ${to}${rest === 'last' ? ' (the last START/END block)' : ''}.`
   const copied = (await $.ui.copy({ text })).isCopied
@@ -77,9 +81,8 @@ async function send($: EngineInterface, args: string): Promise<string> {
 export function relay(on: On, options: Options): void {
   on('command.run', { command: 'sessions' }, async $ => {
     if (!isOn(options, 'relay')) return { text: 'relay is off (/mods on relay).' }
-    const now = await $.clock.now()
-    await recordSelf($, now)
-    return { text: listing(await registry($, now), await $.session.id(), await projectName($), now) }
+    const text = listing(await registry($), await $.session.id(), await projectOf($, await $.session.cwd()), await $.clock.now())
+    return { text }
   })
 
   on('command.run', { command: 'relay' }, async ($, e) => {

@@ -2,7 +2,6 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, On } from 'claude-code'
 
 import type { PulseHandoffItem, PulseParkedItem, PulseSelection, PulseView } from '../../types'
-import { STORE_PREFIX, type SessionEntry } from '../lib/relay'
 import { addParked, isForSurface, openHandoffs, parseParkArgs, removeParked, surfaceOf } from '../lib/memory'
 import { batonOf, parentOf, parkedOf, type Project } from '../lib/project'
 import { isOn, type Options } from '../lib/switch'
@@ -91,22 +90,6 @@ async function refresh($: EngineInterface, options: Options): Promise<void> {
   if (current?.kind === 'handoff' && current.index > nextHandoffs.length) await update($, selected, () => null)
 }
 
-/** Puts this session in the cross-session registry relay reads (/sessions, /relay). */
-async function record($: EngineInterface, options: Options): Promise<void> {
-  if (!isOn(options, 'relay')) return
-  const id = await $.session.id()
-  const cwd = await $.session.cwd()
-  const project = await findProject($)
-  const entry: SessionEntry = {
-    id,
-    name: await read($, sessionName),
-    project: project?.name ?? cwd.slice(cwd.lastIndexOf('/') + 1),
-    cwd,
-    lastSeen: await $.clock.now(),
-  }
-  await $.store.set(`${STORE_PREFIX}${id}`, entry)
-}
-
 async function doUnpark($: EngineInterface, options: Options, n: number): Promise<string> {
   const project = await findProject($)
   if (project === null || project.memoryDir === null) return 'No Claude_Memory/INDEX.md above this folder.'
@@ -123,28 +106,24 @@ export function pulse(on: On, options: Options): void {
   // Also fires after each reload of this plugin, so the band is filled without waiting for a prompt.
   on('session.start', { isInteractive: true }, async ($, e, next) => {
     await refresh($, options)
-    try { await record($, options) } catch { /* the registry is a convenience */ }
     return next(e)
   })
 
   on('classic.SessionStart', async ($, e, next) => {
     if (typeof e.session_title === 'string' && e.session_title !== '') await update($, sessionName, () => e.session_title ?? null)
     await refresh($, options)
-    try { await record($, options) } catch { /* the registry is a convenience */ }
     return next(e)
   })
 
   on('classic.UserPromptSubmit', async ($, e, next) => {
     if (typeof e.session_title === 'string' && e.session_title !== '') await update($, sessionName, () => e.session_title ?? null)
     await refresh($, options)
-    try { await record($, options) } catch { /* the registry is a convenience */ }
     return next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
     await refresh($, options)
-    try { await record($, options) } catch { /* the registry is a convenience */ }
     return done
   })
 

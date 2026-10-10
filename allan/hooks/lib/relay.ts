@@ -1,31 +1,53 @@
-export type SessionEntry = { id: string; name: string | null; project: string; cwd: string; lastSeen: number }
+export type SessionEntry = { id: string; name: string | null; project: string; cwd: string; lastSeen: number; status: string; pid: number }
 export type InboxItem = { from: string; at: number; preview: string }
 
-export const STORE_PREFIX = 'session:'
-export const LIVE_MS = 12 * 3_600_000
-export const FORGET_MS = 7 * 86_400_000
+/**
+ * One file of Claude Code's own live session list (~/.claude/sessions/<pid>.json): the session's
+ * id, the name given with /rename, its folder, status and last activity. Project is filled later.
+ */
+export function parseSessionFile(text: string): Omit<SessionEntry, 'project'> | null {
+  try {
+    const d = JSON.parse(text) as Record<string, unknown>
+    if (typeof d['sessionId'] !== 'string' || typeof d['cwd'] !== 'string' || typeof d['pid'] !== 'number') return null
+    return {
+      id: d['sessionId'],
+      name: typeof d['name'] === 'string' && d['name'] !== '' ? d['name'] : null,
+      cwd: d['cwd'],
+      lastSeen: typeof d['updatedAt'] === 'number' ? d['updatedAt'] : 0,
+      status: typeof d['status'] === 'string' ? d['status'] : '',
+      pid: d['pid'],
+    }
+  } catch {
+    return null
+  }
+}
 
-export function isEntry(v: unknown): v is SessionEntry {
-  const o = v as Record<string, unknown> | null
-  return o !== null && typeof o === 'object' && typeof o['id'] === 'string' && typeof o['project'] === 'string' && typeof o['lastSeen'] === 'number'
+/** `ps -o pid= -p 1,2,3` output → the pids still running. */
+export function alivePids(psOut: string): Set<number> {
+  return new Set(psOut.split('\n').map(l => Number.parseInt(l.trim(), 10)).filter(Number.isFinite))
 }
 
 export function label(s: SessionEntry): string {
-  return s.name ?? `unnamed ${s.id.slice(0, 8)}`
+  return s.name ?? s.id.slice(0, 8)
+}
+
+function ago(ms: number): string {
+  const mins = Math.max(0, Math.round(ms / 60_000))
+  if (mins < 60) return `${mins}m`
+  const hours = Math.round(mins / 60)
+  return hours < 48 ? `${hours}h` : `${Math.round(hours / 24)}d`
 }
 
 /** This project's sessions first, then the others grouped by project; the caller's own marked. */
 export function listing(all: SessionEntry[], selfId: string, project: string, now: number): string {
-  const live = all.filter(s => now - s.lastSeen < LIVE_MS)
-  if (live.length === 0) return 'No sessions seen in the last 12 hours.'
-  const projects = [...new Set(live.map(s => s.project))].sort((a, b) => (a === project ? -1 : b === project ? 1 : a.localeCompare(b)))
+  if (all.length === 0) return 'No open sessions found.'
+  const projects = [...new Set(all.map(s => s.project))].sort((a, b) => (a === project ? -1 : b === project ? 1 : a.localeCompare(b)))
   const lines: string[] = []
   for (const p of projects) {
     lines.push(p === project ? `${p} (this project)` : p)
-    for (const s of live.filter(x => x.project === p).sort((a, b) => b.lastSeen - a.lastSeen)) {
-      const mins = Math.round((now - s.lastSeen) / 60_000)
-      const ago = mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`
-      lines.push(`  ${label(s).padEnd(18)} ${ago.padStart(4)} ago${s.id === selfId ? '  ← this session' : ''}`)
+    for (const s of all.filter(x => x.project === p).sort((a, b) => b.lastSeen - a.lastSeen)) {
+      const state = s.status === 'busy' ? 'working' : `active ${ago(now - s.lastSeen)} ago`
+      lines.push(`  ${label(s).padEnd(26)} ${state}${s.id === selfId ? '  ← this session' : ''}`)
     }
   }
   lines.push('', '/relay <name> <text|last> · another project: /relay <Project>/<name> …')
@@ -34,20 +56,23 @@ export function listing(all: SessionEntry[], selfId: string, project: string, no
 
 export type Resolved = { ok: true; to: SessionEntry } | { ok: false; why: string }
 
-/** `Name` looks in this project first, then everywhere; `Project/Name` looks in that project. Never guesses. */
-export function resolve(target: string, all: SessionEntry[], selfId: string, project: string, now: number): Resolved {
-  const live = all.filter(s => now - s.lastSeen < LIVE_MS && s.id !== selfId && s.name !== null)
+/**
+ * `Name` looks in this project first, then everywhere; `Project/Name` looks in that project; an id
+ * prefix (6+ characters, as /sessions shows for an unnamed session) names one directly. Never guesses.
+ */
+export function resolve(target: string, all: SessionEntry[], selfId: string, project: string): Resolved {
+  const others = all.filter(s => s.id !== selfId)
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
   const slash = target.indexOf('/')
-  const candidates = slash > 0
-    ? live.filter(s => same(s.project, target.slice(0, slash)) && same(s.name ?? '', target.slice(slash + 1)))
-    : (() => {
-        const here = live.filter(s => s.project === project && same(s.name ?? '', target))
-        return here.length > 0 ? here : live.filter(s => same(s.name ?? '', target))
-      })()
+  const scope = slash > 0 ? others.filter(s => same(s.project, target.slice(0, slash))) : others
+  const want = slash > 0 ? target.slice(slash + 1) : target
+  const byName = (list: SessionEntry[]) => list.filter(s => s.name !== null && same(s.name, want))
+  let candidates = slash > 0 ? byName(scope) : byName(scope.filter(s => s.project === project))
+  if (candidates.length === 0 && slash < 0) candidates = byName(scope)
+  if (candidates.length === 0 && /^[0-9a-f]{6,}$/i.test(want)) candidates = scope.filter(s => s.id.toLowerCase().startsWith(want.toLowerCase()))
   const first = candidates[0]
   if (candidates.length === 1 && first !== undefined) return { ok: true, to: first }
-  if (candidates.length === 0) return { ok: false, why: `No live session named "${target}". /sessions lists them.` }
+  if (candidates.length === 0) return { ok: false, why: `No open session named "${target}". /sessions lists them.` }
   return { ok: false, why: `"${target}" matches ${candidates.length} sessions: ${candidates.map(s => `${s.project}/${label(s)}`).join(', ')}. Name one as <Project>/<name>.` }
 }
 
