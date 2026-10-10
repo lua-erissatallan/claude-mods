@@ -14,7 +14,6 @@ const handoffItems = atom({ plugin: 'allan', key: 'handoffItems' } as const, [])
 const selected = atom({ plugin: 'allan', key: 'selected' } as const, null)
 
 const PARKED_HOTKEYS = '123456789'
-const HANDOFF_HOTKEYS = 'abcdefghi'
 
 export const pulseCommands = [
   { name: 'pending', description: 'What is pending here: baton, parked items with ages, open handoffs for this session. Reads the files, no model call.' },
@@ -76,7 +75,7 @@ async function refresh($: EngineInterface, options: Options): Promise<void> {
     handoffs: mine.length,
   }
   const nextParked: PulseParkedItem[] = parked.slice(0, PARKED_HOTKEYS.length).map((p, i) => ({ index: i + 1, ...p }))
-  const nextHandoffs: PulseHandoffItem[] = mine.slice(0, HANDOFF_HOTKEYS.length).map((r, i) => ({ index: i + 1, ...r }))
+  const nextHandoffs: PulseHandoffItem[] = mine.map((r, i) => ({ index: i + 1, ...r }))
 
   await update($, view, () => nextView)
   await update($, parkedItems, () => nextParked)
@@ -202,11 +201,11 @@ export function pulse(on: On, options: Options): void {
                 {PARKED_HOTKEYS[p.index - 1]}:{p.text.slice(0, 16)}
               </Button>
             ))}
-            {handoffs.map(row => (
-              <Button key={`h${row.index}`} hotkey={HANDOFF_HOTKEYS[row.index - 1]} dimColor onPress={openOn({ kind: 'handoff', index: row.index })}>
-                {HANDOFF_HOTKEYS[row.index - 1]}:{row.id}
+            {handoffs.length > 0 && (
+              <Button key="handoffs" hotkey="h" dimColor onPress={openOn({ kind: 'handoff', index: 1 })}>
+                h:{handoffs.length === 1 ? handoffs[0]?.id : `${handoffs.length} handoffs`}
               </Button>
-            ))}
+            )}
           </Box>
         )}
       </Box>
@@ -222,7 +221,7 @@ export function pulse(on: On, options: Options): void {
     if (sel === null) {
       return (
         <Box flexDirection="column">
-          <Text dimColor>Press a hotkey in the band (digits for parked, letters for handoffs) to see it here.</Text>
+          <Text dimColor>Press a hotkey in the band (digits for parked, h for handoffs) to see it here.</Text>
         </Box>
       )
     }
@@ -246,14 +245,24 @@ export function pulse(on: On, options: Options): void {
       )
     }
 
-    const item = handoffs.find(h => h.index === sel.index)
+    const item = handoffs.find(row => row.index === sel.index)
     if (item === undefined) return <Text dimColor>That handoff is gone.</Text>
+    const step = (by: number) => async () => {
+      const n = ((item.index - 1 + by + handoffs.length) % handoffs.length) + 1
+      await update($, selected, () => ({ kind: 'handoff' as const, index: n }))
+    }
     return (
       <Box flexDirection="column">
         <Text bold>{item.id}</Text>
-        <Text dimColor>from {item.from} → {item.to}</Text>
+        <Text dimColor>from {item.from} → {item.to}  ·  {item.index} of {handoffs.length}</Text>
         <Text>{item.title}</Text>
         <Box>
+          {handoffs.length > 1 && (
+            <Button key="prev" hotkey="p" onPress={step(-1)}>p:Prev</Button>
+          )}
+          {handoffs.length > 1 && (
+            <Button key="next" hotkey="n" onPress={step(1)}>n:Next</Button>
+          )}
           <Button role="dismiss" onPress={async () => { await update($, selected, () => null) }}>
             Close
           </Button>

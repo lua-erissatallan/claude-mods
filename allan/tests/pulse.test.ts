@@ -172,13 +172,39 @@ describe('pulse', () => {
       component: 'AbovePrompt',
       props: { hasSurvey: false, isWorking: false, maxRows: 4, bodyColumns: 120 },
     } as never)
-    await band.press({ key: 'h1' } as never)
+    await band.press({ key: 'handoffs' } as never)
 
     const pane = await $.ui.mount({ plugin: 'allan', surface: 'terminal', component: 'Pane', requestId: 'allan-pulse', props: { title: 'Pulse', isFocused: true, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 20 } } } as never)
     const shown = (await pane.find({ type: 'Text', text: /O16/ } as never))?.text ?? ''
     expect(shown).toBe('O16')
+    expect(await pane.find({ key: 'next' } as never)).toBeFalsy()
     expect(wrote).toBe(false)
 
+    await band.unmount()
+    await pane.unmount()
+  })
+  test('h opens the first handoff; Next pages through the rest', async ($, on) => {
+    const two = `${HANDOFFS}\n| O17 | Orchestrator → Code | Second thing | 2026-09-14 | [ ] open |`
+    mock.env(on, {})
+    mock.clock(on)
+    on('session.cwd', () => ({ value: '/w/M-Kopa' }))
+    on('fs.exists', ($, e) => ({ value: e.path === '/w/M-Kopa/Claude_Memory/INDEX.md' || e.path === '/w/M-Kopa/Claude_Memory/HANDOFFS.md' }))
+    on('fs.read', ($, e) => ({ value: String(e.path).endsWith('INDEX.md') ? INDEX : two }))
+    on('command.register', ($, e) => ({ value: { command: e.name } }))
+    on('session.start', ($, e) => ({ cwd: e.cwd }))
+    on('ui.open', () => ({ value: { isPlaced: true } }))
+    on('classic.UserPromptSubmit', ($, e) => ({ prompt: e.prompt } as never))
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w/M-Kopa' })
+    await $.classic.UserPromptSubmit({ prompt: 'hi', session_title: 'Code' } as never)
+
+    const band = await $.ui.mount({ plugin: 'allan', surface: 'terminal', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 4, bodyColumns: 120 } } as never)
+    await band.press({ key: 'handoffs' } as never)
+    const pane = await $.ui.mount({ plugin: 'allan', surface: 'terminal', component: 'Pane', requestId: 'allan-pulse', props: { title: 'Pulse', isFocused: true, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 20 } } } as never)
+    expect((await pane.find({ type: 'Text', text: /^O16$/ } as never))?.text).toBe('O16')
+    await pane.press({ key: 'next' } as never)
+    expect((await pane.find({ type: 'Text', text: /^O17$/ } as never))?.text).toBe('O17')
+    await pane.press({ key: 'next' } as never)
+    expect((await pane.find({ type: 'Text', text: /^O16$/ } as never))?.text).toBe('O16')
     await band.unmount()
     await pane.unmount()
   })
