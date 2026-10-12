@@ -16,6 +16,7 @@ export type PulseSelection = { kind: 'parked' | 'handoff' | 'parkedList' | 'inbo
 export type RelayInboxItem = { from: string; at: number; preview: string }
 export type WatchLight = { level: 'green' | 'amber' | 'red'; text: string; at: number; project: string }
 export type WatchUnseen = { errors: number; blocks: number; bypass: number; since: number | null }
+export type OutboxDraft = { id: number; status: 'DRAFT' | 'SENT' | 'DROPPED'; date: string; to: string; title: string; body: string; by: string }
 export type ReleaseAgent = { dir: string; name: string; active: number | null; next: number | null; nextMessage: string; count: number; prune: number[]; error: string | null; done: boolean }
 
 declare module 'claude-code' {
@@ -37,6 +38,8 @@ declare module 'claude-code' {
       watchRecent: string[]
       testMode: boolean
       secrets: Record<string, string>
+      outboxDrafts: OutboxDraft[]
+      outboxNote: string | null
     }
   }
 }

@@ -32,4 +32,5 @@ export const FEATURES: Record<string, readonly string[]> = {
   release: ['release'],
   watch: ['watch', 'watchIntervalMin'],
   testguard: ['testguard'],
+  outbox: ['outbox'],
 }

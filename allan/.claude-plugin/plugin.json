@@ -154,6 +154,13 @@
       "description": "While /testmode is on (or ALLAN_TESTMODE=1), a Bash command or script naming a protected address from .claude-mods.json, or a lua env -k key ending in CC, ALLOWLIST, RECIPIENT or TO, is refused. /secret set NAME holds a clipboard value for this session, injects it where $NAME is used, and redacts it from the transcript. A prompt carrying a key shaped string gets a warning.",
       "required": false,
       "default": true
+    },
+    "outbox": {
+      "type": "boolean",
+      "title": "outbox: drafts for contacts kept in MESSAGES.md",
+      "description": "When a reply holds a message for a contact named in .claude-mods.json (a START/END block naming them, or a quoted block introduced as a draft for them), it is appended to Claude_Memory/MESSAGES.md as a DRAFT. /outbox opens a pane with Copy, Copy for Slack (tables become aligned text) and Mark sent. Drafts older than a day are mentioned at session start. Every copy reminds you to re-read live state first.",
+      "required": false,
+      "default": true
     }
   }
 }
