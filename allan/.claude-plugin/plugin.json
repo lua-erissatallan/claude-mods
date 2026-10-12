@@ -133,6 +133,20 @@
       "description": "/promote reads the version list for this agent and its paired agents (.claude-mods.json pairs), refuses on a dirty git tree, and opens a pane with one Promote button per agent. The press runs the promote with LUA_DEPLOY_CONFIRMED=1, prunes the oldest versions past versionCap, and notes the release in Claude_Memory/TECH.md. Unverified live until Allan tries it on a staged version.",
       "required": false,
       "default": true
+    },
+    "watch": {
+      "type": "boolean",
+      "title": "watch: a light on the band from the agent logs",
+      "description": "Every few minutes one session per project reads a page of the agent's logs (lua logs --ci --json --limit 100) and the checks in .claude-mods.json, and sets a green, amber or red dot on the pulse band. Amber: more errors than the week's usual, or preprocessor blocks. Red: a gate bypassed, a check failing, or many errors. /logs prints what it saw since you last asked.",
+      "required": false,
+      "default": true
+    },
+    "watchIntervalMin": {
+      "type": "number",
+      "title": "watch: minutes between looks",
+      "description": "How often the watching session reads the logs. One page per look.",
+      "required": false,
+      "default": 10
     }
   }
 }

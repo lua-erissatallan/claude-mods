@@ -14,6 +14,8 @@ export type PulseParkedItem = { index: number; date: string; ageDays: number; te
 export type PulseHandoffItem = { index: number; id: string; from: string; to: string; title: string }
 export type PulseSelection = { kind: 'parked' | 'handoff' | 'parkedList' | 'inbox'; index: number } | null
 export type RelayInboxItem = { from: string; at: number; preview: string }
+export type WatchLight = { level: 'green' | 'amber' | 'red'; text: string; at: number; project: string }
+export type WatchUnseen = { errors: number; blocks: number; bypass: number; since: number | null }
 export type ReleaseAgent = { dir: string; name: string; active: number | null; next: number | null; nextMessage: string; count: number; prune: number[]; error: string | null; done: boolean }
 
 declare module 'claude-code' {
@@ -30,6 +32,9 @@ declare module 'claude-code' {
       askTurn: boolean
       releasePlan: ReleaseAgent[] | null
       releaseLog: string[]
+      watchLight: WatchLight | null
+      watchUnseen: WatchUnseen
+      watchRecent: string[]
     }
   }
 }

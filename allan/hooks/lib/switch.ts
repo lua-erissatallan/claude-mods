@@ -30,4 +30,5 @@ export const FEATURES: Record<string, readonly string[]> = {
   relay: ['relay'],
   askmode: ['askmode', 'askmodeUseModel'],
   release: ['release'],
+  watch: ['watch', 'watchIntervalMin'],
 }

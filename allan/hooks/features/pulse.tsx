@@ -14,6 +14,8 @@ const handoffItems = atom({ plugin: 'allan', key: 'handoffItems' } as const, [])
 const selected = atom({ plugin: 'allan', key: 'selected' } as const, null)
 // Messages other sessions relayed here (relay.ts records them).
 const inbox = atom({ plugin: 'allan', key: 'inbox' } as const, [])
+// watch's light (watch.ts writes it).
+const watchLight = atom({ plugin: 'allan', key: 'watchLight' } as const, null)
 // askmode's mark on a question turn lasts until the turn completes.
 const askTurn = atom({ plugin: 'allan', key: 'askTurn' } as const, false)
 
@@ -179,6 +181,7 @@ export function pulse(on: On, options: Options): void {
     const { Box, Text, Button } = $.ui.resolve(e)
     const handoffs = await read($, handoffItems)
     const received = await read($, inbox)
+    const lightNow = await read($, watchLight)
 
     const parts = [
       v.session ?? 'unnamed',
@@ -195,6 +198,9 @@ export function pulse(on: On, options: Options): void {
     const stale = v.staleCount > 0
     return (
       <Box>
+        {lightNow !== null && (
+          <Text color={lightNow.level === 'green' ? 'green' : lightNow.level === 'amber' ? 'yellow' : 'red'}>● </Text>
+        )}
         <Text dimColor>{parts.join('  ·  ')}</Text>
         {v.parked > 0 && <Text dimColor>  ·  </Text>}
         {v.parked > 0 && (
