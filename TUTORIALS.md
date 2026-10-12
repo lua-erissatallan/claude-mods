@@ -82,7 +82,7 @@ Later, when a Code session walks you through how the Luganda model comparison wa
 allan/commit: this push would leave under the wrong identity: remote is git@github.com:erissatallan/x.git (not github.com-lua). Fix the remote or user.email in /…/demo, or allow it with /mods set commitIdentity warn.
 ```
 
-A session writing `docs/Voice_Feedback.md` for John Michael with a line like "see D12" gets a toast, because a client should never see a memory id.
+A session writing `docs/Voice_Feedback.md` for John Michael with a line pointing at a DECISIONS entry by its id gets a toast, because a client should never see a memory id.
 
 **What you see.** Nothing when all is well. A toast for a warning. A refusal text from the tool for a block, which Claude reads and fixes.
 
@@ -157,7 +157,7 @@ When the engine wants to auto compact a lead session you see a toast: "Auto comp
 Names repeat across projects (there is a Code-2 in M-Kopa too), so a bare name looks in this project first. To reach another project, name it:
 
 ```
-/relay Finance_Agent/Lead-Agent-12 Diana's response rate ruling is in; read HANDOFFS CD2 before you continue.
+/relay Finance_Agent/Lead-Agent-12 Diana's response rate ruling is in; read the open handoff about it before you continue.
 ```
 
 **What you see.** `/sessions` prints each project with its sessions and how long ago each was active, your own marked `← this session`. `/relay` replies "Relayed to Finance_Agent/Lead-Agent-12." If two sessions share the name it refuses and lists them, never guesses. If delivery fails, the message is copied to your clipboard and the reason is printed. In the receiving session the band shows `i:✉ 1 from Orchestrator (Production)`; press `i` to see the list with a Clear button, and that session's Claude reads the message as a prompt.
