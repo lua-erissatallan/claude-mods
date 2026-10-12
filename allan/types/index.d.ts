@@ -14,6 +14,7 @@ export type PulseParkedItem = { index: number; date: string; ageDays: number; te
 export type PulseHandoffItem = { index: number; id: string; from: string; to: string; title: string }
 export type PulseSelection = { kind: 'parked' | 'handoff' | 'parkedList' | 'inbox'; index: number } | null
 export type RelayInboxItem = { from: string; at: number; preview: string }
+export type ReleaseAgent = { dir: string; name: string; active: number | null; next: number | null; nextMessage: string; count: number; prune: number[]; error: string | null; done: boolean }
 
 declare module 'claude-code' {
   interface PluginState {
@@ -27,6 +28,8 @@ declare module 'claude-code' {
       handoverFired: number[]
       inbox: RelayInboxItem[]
       askTurn: boolean
+      releasePlan: ReleaseAgent[] | null
+      releaseLog: string[]
     }
   }
 }

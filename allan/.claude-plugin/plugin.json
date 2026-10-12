@@ -126,6 +126,13 @@
       "description": "For a message the word rules cannot place, one Haiku call decides whether it is a question.",
       "required": false,
       "default": false
+    },
+    "release": {
+      "type": "boolean",
+      "title": "release: /promote with a human button",
+      "description": "/promote reads the version list for this agent and its paired agents (.claude-mods.json pairs), refuses on a dirty git tree, and opens a pane with one Promote button per agent. The press runs the promote with LUA_DEPLOY_CONFIRMED=1, prunes the oldest versions past versionCap, and notes the release in Claude_Memory/TECH.md. Unverified live until Allan tries it on a staged version.",
+      "required": false,
+      "default": true
     }
   }
 }

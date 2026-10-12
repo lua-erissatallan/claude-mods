@@ -29,4 +29,5 @@ export const FEATURES: Record<string, readonly string[]> = {
   handover: ['handover', 'handoverThresholds', 'handoverLeadPattern', 'handoverBlockAutoCompact'],
   relay: ['relay'],
   askmode: ['askmode', 'askmodeUseModel'],
+  release: ['release'],
 }
