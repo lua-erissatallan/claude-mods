@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, On } from 'claude-code'
 
 import { HELD, intentOf, isMutatingBash } from '../lib/askmode'
+import { looksLikeKey } from '../lib/testguard'
 import { isOn, type Options } from '../lib/switch'
 
 // Whether the turn running now answers a question; pulse clears it when the turn completes.
@@ -22,6 +23,8 @@ async function hold($: EngineInterface, what: string): Promise<{ deny: string }>
 
 export function askmode(on: On, options: Options): void {
   on('prompt.submit', async ($, e, next) => {
+    // testguard's warning lives here because prompt.submit has one owner per plugin.
+    if (isOn(options, 'testguard') && looksLikeKey(e.text)) $.ui.toast('That message carries something shaped like an API key. Rotate it if it is real; prefer /secret set NAME.')
     if (!isOn(options, 'askmode')) return next(e)
     let intent = intentOf(e.text)
     if (intent === 'unclear' && usesModel(options)) {

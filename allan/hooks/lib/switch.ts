@@ -31,4 +31,5 @@ export const FEATURES: Record<string, readonly string[]> = {
   askmode: ['askmode', 'askmodeUseModel'],
   release: ['release'],
   watch: ['watch', 'watchIntervalMin'],
+  testguard: ['testguard'],
 }

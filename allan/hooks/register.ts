@@ -8,6 +8,7 @@ import { mods, modsCommand } from './features/mods'
 import { pulse, pulseCommands } from './features/pulse'
 import { release, releaseCommands } from './features/release'
 import { relay, relayCommands } from './features/relay'
+import { testguard, testguardCommands } from './features/testguard'
 import { asStyle, styleCommand, voice, voiceText } from './features/voice'
 import { watch, watchCommands } from './features/watch'
 import { thresholdsOf } from './lib/handover'
@@ -34,6 +35,7 @@ export const register: Register = (on, options) => {
     for (const spec of askmodeCommands) await $.command.register(spec)
     for (const spec of releaseCommands) await $.command.register(spec)
     for (const spec of watchCommands) await $.command.register(spec)
+    for (const spec of testguardCommands) await $.command.register(spec)
     // A reload keeps the old status line until the next measurement: set it now (handover's meter).
     try {
       const percent = (await $.session.usage()).context.percent
@@ -60,4 +62,5 @@ export const register: Register = (on, options) => {
   try { askmode(on, options) } catch { /* reported by the engine */ }
   try { release(on, options) } catch { /* reported by the engine */ }
   try { watch(on, options) } catch { /* reported by the engine */ }
+  try { testguard(on, options) } catch { /* reported by the engine */ }
 }

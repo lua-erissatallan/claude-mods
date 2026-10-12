@@ -35,6 +35,8 @@ declare module 'claude-code' {
       watchLight: WatchLight | null
       watchUnseen: WatchUnseen
       watchRecent: string[]
+      testMode: boolean
+      secrets: Record<string, string>
     }
   }
 }

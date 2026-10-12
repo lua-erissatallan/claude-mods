@@ -147,6 +147,13 @@
       "description": "How often the watching session reads the logs. One page per look.",
       "required": false,
       "default": 10
+    },
+    "testguard": {
+      "type": "boolean",
+      "title": "testguard: protect real people while testing; /secret",
+      "description": "While /testmode is on (or ALLAN_TESTMODE=1), a Bash command or script naming a protected address from .claude-mods.json, or a lua env -k key ending in CC, ALLOWLIST, RECIPIENT or TO, is refused. /secret set NAME holds a clipboard value for this session, injects it where $NAME is used, and redacts it from the transcript. A prompt carrying a key shaped string gets a warning.",
+      "required": false,
+      "default": true
     }
   }
 }
