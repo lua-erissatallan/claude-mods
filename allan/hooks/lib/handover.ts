@@ -1,6 +1,8 @@
 import type { Parked } from './project'
 
 export const SECTIONS = ['Work done', 'Learnings and gotchas', 'Pending items', 'How to start'] as const
+/** Drafted with the sections but kept out of the file: what this session should still do itself. */
+export const CLOSING = 'Do before closing this session'
 
 /** "60,70,80,90" → [60, 70, 80, 90], sorted, out of range values dropped. */
 export function thresholdsOf(raw: string): number[] {
@@ -31,14 +33,33 @@ export function alertText(percent: number, threshold: number, thresholds: number
   return `Context ${percent}%. Plan the handover: /handover <successor> when you reach a stopping point.`
 }
 
+/** Allan's own handover ask, as he types it when a session is almost out of context. */
 export function forkPrompt(successor: string, me: string): string {
   return [
-    `Write the handover document for ${successor}, who takes over from this session (${me}).`,
-    `Use exactly these four sections as "## " headings, in this order: ${SECTIONS.join('; ')}.`,
-    'Under each, short bullets with the specifics a fresh session needs: file paths, commit hashes, commands, decisions and why.',
-    'Pending items in priority order, each with its next step. How to start: what to read first and the first action.',
-    'Write only the four sections: no preamble, no closing line. No em dashes.',
+    `This session (${me}) is almost out of context. Write the handover document for the \`${successor}\` session Allan will create and point at it.`,
+    'Include all our work, learnings, gotchas, pending items, deploys and commits, things we learned from breaking things or from being wrong, and things that are easy to get wrong for a session that does not know what you now know. The objective is to lose no important context and have that session proceed as if it were you.',
+    `Use exactly these five sections as "## " headings, in this order: ${SECTIONS.join('; ')}; ${CLOSING}.`,
+    'Work done: what changed, with file paths, commit hashes and commands. Learnings and gotchas: what broke, what we were wrong about, what is easy to get wrong. Pending items: every unfinished thread, deploy, commit or question in priority order, each with its next step, and say which of them are recorded nowhere else the successor can see. How to start: what to read first and the first action.',
+    `${CLOSING}: the pending items you recommend this session handles itself with its remaining context, because they are quicker to finish here than to hand over; write "- none" if there are none.`,
+    'Short bullets, specific, no preamble, no closing line. No em dashes.',
   ].join('\n')
+}
+
+/** Allan's closing question: what lives only in this conversation. */
+export function closePrompt(): string {
+  return [
+    'Allan is about to close this session and not come back to it.',
+    'Is there pending work, learnings or items that live only in this conversation, which a successor session will not learn or catch from the files (Claude_Memory, HANDOVER files, git)?',
+    'Answer with "Nothing: safe to close." or a short bullet list, each item with where it should be recorded. No preamble. No em dashes.',
+  ].join('\n')
+}
+
+/** Splits one "## <name>" section out of a drafted body: the body without it, and its bullets. */
+export function splitSection(body: string, name: string): { rest: string; section: string | null } {
+  const re = new RegExp(`^##\\s+${name}\\s*$\\n([\\s\\S]*?)(?=^##\\s|(?![\\s\\S]))`, 'mi')
+  const m = body.match(re)
+  if (m === null) return { rest: body, section: null }
+  return { rest: (body.slice(0, m.index) + body.slice((m.index ?? 0) + m[0].length)).trim(), section: (m[1] ?? '').trim() }
 }
 
 /** The model's sections when all four headings came back, else null. */
@@ -70,14 +91,14 @@ export function kickoff(args: { me: string; successor: string; project: string; 
   const marker = `message for ${args.successor}`
   return [
     `▼▼▼ START · ${marker}`,
-    `You are ${args.successor}, successor to ${args.me} in the ${args.project} workspace (${args.root}).`,
+    `You are ${args.successor}, successor to ${args.me} in the ${args.project} workspace (${args.root}). The objective is to lose no context and proceed as if you were ${args.me}.`,
     '',
     'Read first, in order:',
     `1. ${args.file}, all of it`,
     '2. Claude_Memory/INDEX.md: the ▶ Baton line and ⏳ Parked',
     '',
     'Register yourself in Claude_Memory/HANDOFFS.md → ## Surfaces if the startup hook asks.',
-    'Then tell me in a few lines where things stand and what you will do first.',
+    'Then tell me in a few lines where things stand, what is pending, and what you will do first.',
     `▲▲▲ END · ${marker}`,
   ].join('\n')
 }

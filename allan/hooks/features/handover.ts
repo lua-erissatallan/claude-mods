@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, On } from 'claude-code'
 
-import { alertFor, alertText, closeChecks, emptySections, forkPrompt, handoverDoc, isLead, kickoff, localDate, sectionsFrom, thresholdsOf } from '../lib/handover'
+import { alertFor, alertText, CLOSING, closeChecks, closePrompt, emptySections, forkPrompt, handoverDoc, isLead, kickoff, localDate, sectionsFrom, splitSection, thresholdsOf } from '../lib/handover'
 import { parentOf, parkedOf, type Project } from '../lib/project'
 import { isOn, textOf, type Options } from '../lib/switch'
 
@@ -55,7 +55,11 @@ async function writeHandover($: EngineInterface, args: string): Promise<string> 
 
   const me = (await read($, sessionName)) ?? 'this session'
   const reply = await $.model.fork({ prompt: forkPrompt(successor, me) })
-  const drafted = reply.isAnswered ? sectionsFrom(reply.text) : null
+  const whole = reply.isAnswered ? sectionsFrom(reply.text) : null
+  // The closing advice is for Allan now, not for the successor's file.
+  const split = whole === null ? null : splitSection(whole, CLOSING)
+  const drafted = split?.rest ?? null
+  const closing = split?.section ?? null
   const usage = await $.session.usage()
   await $.fs.write(file, handoverDoc({
     me,
@@ -73,6 +77,8 @@ async function writeHandover($: EngineInterface, args: string): Promise<string> 
     : `The model did not draft it (${reply.isAnswered ? 'its reply lacked the four headings' : reply.reason}): the file has empty headings to fill.`
   return [
     `Wrote ${shown}. ${how}`,
+    ...(closing === null || /^-\s*none\b/i.test(closing) ? [] : ['', 'Recommended to finish here, with the remaining context, rather than hand over:', closing]),
+    '',
     copied ? 'Kickoff prompt copied to the clipboard:' : 'Kickoff prompt (copy it by hand):',
     '',
     prompt,
@@ -112,10 +118,18 @@ async function close($: EngineInterface, options: Options): Promise<string> {
     staleDays: typeof stale === 'number' && stale > 0 ? stale : 7,
   })
   const missing = checks.filter(c => !c.ok).length
+  // Allan's closing question, answered over this session's own transcript.
+  let only = 'Could not ask the model what lives only in this conversation.'
+  try {
+    const reply = await $.model.fork({ prompt: closePrompt() })
+    only = reply.isAnswered ? reply.text.trim() : `Could not ask the model what lives only in this conversation (${reply.reason}).`
+  } catch { /* the checklist still stands */ }
+  const clean = /^nothing\b/i.test(only)
   return [
     ...checks.map(c => `${c.ok ? '✔' : '✘'} ${c.line}`),
+    `${clean ? '✔' : '✘'} Only in this conversation: ${only}`,
     '',
-    missing === 0 ? 'Safe to close.' : `Not yet: ${missing} item${missing === 1 ? '' : 's'} above.`,
+    missing === 0 && clean ? 'Safe to close.' : `Not yet: ${missing + (clean ? 0 : 1)} item${missing + (clean ? 0 : 1) === 1 ? '' : 's'} above.`,
   ].join('\n')
 }
 

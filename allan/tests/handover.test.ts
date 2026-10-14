@@ -1,7 +1,7 @@
 import { describe, expect, mock, test, tier } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import { alertFor, closeChecks, isLead, sectionsFrom, thresholdsOf } from '../hooks/lib/handover'
+import { alertFor, closeChecks, isLead, sectionsFrom, splitSection, thresholdsOf } from '../hooks/lib/handover'
 
 tier('user')
 
@@ -29,6 +29,8 @@ const DRAFT = [
   '- relay',
   '## How to start',
   '- read BUILD-PLAN.md',
+  '## Do before closing this session',
+  '- push the last commit',
 ].join('\n')
 
 const USAGE = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }
@@ -72,6 +74,10 @@ describe('handover', () => {
     expect(isLead(null, '^Code')).toBe(false)
     expect(sectionsFrom(DRAFT)?.startsWith('## Work done')).toBe(true)
     expect(sectionsFrom('## Work done\n- only one')).toBeNull()
+    const split = splitSection(sectionsFrom(DRAFT) ?? '', 'Do before closing this session')
+    expect(split.section).toBe('- push the last commit')
+    expect(split.rest.endsWith('## How to start\n- read BUILD-PLAN.md')).toBe(true)
+    expect(splitSection('## A\n- x', 'B')).toEqual({ rest: '## A\n- x', section: null })
   })
 
   test('/close checklist names what is missing', async () => {
@@ -135,6 +141,8 @@ describe('handover', () => {
     expect(writes[0]?.[1]).toContain('# HANDOVER: Code-3 → Code-4')
     expect(writes[0]?.[1]).toContain('## Pending items\n- relay')
     expect(writes[0]?.[1]).not.toContain('Here is the handover')
+    expect(writes[0]?.[1]).not.toContain('Do before closing')
+    expect(text).toContain('push the last commit')
     expect(copies[0]).toContain('▼▼▼ START · message for Code-4')
     expect(copies[0]).toContain('▲▲▲ END · message for Code-4')
     expect(copies[0]).toContain('/w/M-Kopa')
@@ -166,10 +174,13 @@ describe('handover', () => {
     const start = workspace(on)
     on('process.run', () => ({ value: OK }))
     on('fs.stat', () => ({ value: { kind: 'file', size: 1, mtimeMs: NOW, isLink: false } }) as never)
+    on('model.fork', () => ({ value: { isAnswered: true, text: '- the Neon key rotation outcome, record it in INDEX', usage: USAGE } }) as never)
     await start($)
     const { text } = await $.command.run(cmd('close', ''))
     expect(text).toContain('working tree clean')
     expect(text).toContain('old thread')
+    expect(text).toContain('✘ Only in this conversation: - the Neon key rotation')
+    expect(text).toContain('Not yet')
   })
 
   test('handover off: no meter, no toast, auto compaction runs', { options: { handover: false } }, async ($, on) => {
